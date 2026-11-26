@@ -37,17 +37,20 @@ const String kDefaultSchoolDatabaseName = 'python-tutor';
 /// configuration (#308, step 3).
 const String kBuildSchoolName = 'SMA Arcadia';
 
-/// How the app reaches a school's database (#306).
+/// How the app reaches a school's database (#306). What a school asks for is
+/// [SchoolConfig.databaseAccess]; what the app uses also depends on the
+/// build ([SchoolConfig.databaseAccessIn], #336).
 enum DatabaseAccess {
   /// With the database key the build carries ([buildSchoolDatabaseKey]).
   /// The default, and the only access a build's own school configuration
-  /// uses.
+  /// uses. Only in a build with school data ([buildHasSchoolData]).
   masterKey,
 
   /// With the user's own Entra sign-in: an access token for the database
   /// account, obtained silently with the stored refresh token. Needs roles
   /// in the database and consent for the database scope in the tenant; a
-  /// school file turns it on with `"databaseAccess": "signIn"`.
+  /// school file turns it on with `"databaseAccess": "signIn"`, and a build
+  /// without school data uses it for every school (#336).
   signIn,
 }
 
@@ -83,9 +86,21 @@ class SchoolConfig {
   /// Shown to the user where it helps; `null` when it is not known.
   final String? schoolName;
 
-  /// How the app reaches the database. [DatabaseAccess.masterKey] unless the
-  /// school file asks for [DatabaseAccess.signIn] (#306).
+  /// How the school asks to reach its database: [DatabaseAccess.masterKey]
+  /// unless the school file asks for [DatabaseAccess.signIn] (#306). The
+  /// app uses [databaseAccessIn], which also asks the build.
   final DatabaseAccess databaseAccess;
+
+  /// How the app reaches this school's database (#336): the sign-in when
+  /// the school file asks for it ([databaseAccess]); otherwise the build
+  /// decides. A build with school data ([buildHasSchoolData]) works as it
+  /// always has; a build without uses the sign-in.
+  ///
+  /// So the school file that step 1 of #308 wrote for every install, which
+  /// has no `databaseAccess`, works in a build with school data and in one
+  /// without. The file itself is never rewritten for it.
+  DatabaseAccess databaseAccessIn({required bool buildHasSchoolData}) =>
+      buildHasSchoolData ? databaseAccess : DatabaseAccess.signIn;
 
   /// The build's own school configuration, or `null` when the build has none.
   /// Named [kBuildSchoolName] (#308).
@@ -134,6 +149,27 @@ class SchoolConfig {
       schoolName: schoolName,
     );
   }
+
+  /// Whether the build's values (the `.env` entries) are a school's data
+  /// (#336): a school configuration ([fromBuildValues]), and a
+  /// [databaseKey] that is not empty or a placeholder ([isMissingValue]).
+  /// CI's dummy `.env` is none, and neither is a build made without school
+  /// data (#308, step 3).
+  static bool hasSchoolData({
+    required String tenantId,
+    required String clientId,
+    required String redirectUri,
+    required String databaseEndpoint,
+    required String databaseKey,
+  }) =>
+      fromBuildValues(
+            tenantId: tenantId,
+            clientId: clientId,
+            redirectUri: redirectUri,
+            databaseEndpoint: databaseEndpoint,
+          ) !=
+          null &&
+      !isMissingValue(databaseKey);
 
   /// Whether a build value stands for "no school": empty, the all-zero GUID,
   /// or a `dummy` placeholder (the CI build's `.env`).
@@ -246,11 +282,23 @@ final class StandaloneMode extends AppMode {
 
 /// The master key for the build's school database.
 ///
-/// Only `CosmosClient.forMode` asks for it, and only for a school with
-/// [DatabaseAccess.masterKey]. It is not part of [SchoolConfig]: a school
-/// file carries no secrets. A school with [DatabaseAccess.signIn] (#306)
-/// never asks for it, so it works with a build that has no key.
+/// Only `CosmosClient.schoolAuth` asks for it, and only for a school on
+/// [DatabaseAccess.masterKey] in a build with school data. It is not part of
+/// [SchoolConfig]: a school file carries no secrets. A school on
+/// [DatabaseAccess.signIn] (#306) never asks for it, so it works with a
+/// build that has no key.
 String buildSchoolDatabaseKey() => AzureConfig.cosmosKey;
+
+/// Whether this build carries school data (#336): see
+/// [SchoolConfig.hasSchoolData]. Without it, every school reaches its
+/// database with the sign-in ([SchoolConfig.databaseAccessIn]).
+bool buildHasSchoolData() => SchoolConfig.hasSchoolData(
+  tenantId: AzureConfig.tenantId,
+  clientId: AzureConfig.clientId,
+  redirectUri: AzureConfig.redirectUri,
+  databaseEndpoint: AzureConfig.cosmosEndpoint,
+  databaseKey: buildSchoolDatabaseKey(),
+);
 
 /// The mode the app runs in. `main()` overrides it with the mode decided at
 /// start (#307); tests override it too. Unoverridden it reads the build.

@@ -1679,7 +1679,11 @@
   },
   "chat_notice_schoolKeyInvalid": "The school's OpenAI API key is not working. Let your teacher know.",
   "@chat_notice_schoolKeyInvalid": {
-    "description": "OpenAI answered 401 on the school's bundled key, or the build has none; nothing the student can fix (#126)"
+    "description": "OpenAI answered 401 on the school's key; nothing the student can fix (#126)"
+  },
+  "chat_notice_schoolKeyMissing": "Your school has not set an OpenAI API key yet. Let your teacher know.",
+  "@chat_notice_schoolKeyMissing": {
+    "description": "The account is on the school's key, but config/global has no ApiKey and there is no fallback, so the tutor made no call (#337)"
   },
   "chat_notice_noPreviousRequest": "No previous request to retry.",
   "chat_notice_emptyResponse": "Empty response from the tutor.",
@@ -2147,5 +2151,5 @@
   "options_school_leave_cancel": "Cancel",
   "options_school_standalone": "At a school? Import your school's file. What you did here stays on this pc.",
   "options_school_import": "Import school file",
-  "auth_localKey_schoolEscape": "At a school? Import your school's file."
+  "auth_localKey_schoolEscape": "At a school? Import the school file your teacher gives you."
 }

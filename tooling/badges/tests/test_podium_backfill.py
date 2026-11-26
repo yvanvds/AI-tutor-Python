@@ -54,15 +54,18 @@ class _Exists(Exception):
 
 
 def _fake_cosmos(accounts, turns, podium, taken=frozenset(), log=None):
+    """The podium in its own container (#338). `config` is not there: the
+    backfill never reads or writes it any more."""
     m = types.ModuleType("cosmos")
     m.Exists = _Exists
     m.creates = []
+    m.queried = []
     log = log if log is not None else []
-    config = [{"id": "global", "type": "config"}, *podium]
 
     def query(coll, sql, params=None, pk=None, cross=True):
-        if coll == "config":
-            return [d for d in config if pk is None or d.get("type") == pk]
+        m.queried.append(coll)
+        if coll == "podium":
+            return [d for d in podium if pk is None or d.get("type") == pk]
         return {"accounts": accounts, "turn_history": turns}[coll]
 
     def create(coll, doc, pk):
@@ -201,7 +204,7 @@ class RunTest(unittest.TestCase):
             """Notes, at every write, how many backups are on disk."""
 
             def append(self, entry):
-                backups_at_write.append(len(list(tmp.glob("backup_config_*.json"))))
+                backups_at_write.append(len(list(tmp.glob("backup_podium_*.json"))))
                 super().append(entry)
 
         held = _place("6WEWI", "s1", 1, "someone-else")
@@ -215,15 +218,17 @@ class RunTest(unittest.TestCase):
         )
         self.assertTrue(backups_at_write)
         self.assertEqual(set(backups_at_write), {1}, "the backup comes before any write")
-        backup = json.loads(next(tmp.glob("backup_config_*.json")).read_text(encoding="utf-8"))
-        self.assertEqual({d["id"] for d in backup["config"]}, {"global", held["id"]})
+        backup = json.loads(next(tmp.glob("backup_podium_*.json")).read_text(encoding="utf-8"))
+        self.assertEqual({d["id"] for d in backup["podium"]}, {held["id"]})
 
         created = {doc["id"]: (coll, doc, pk) for coll, doc, pk in fake.creates}
         self.assertEqual(
             set(created),
             {"podium_6EWI_s1_1", "podium_6EWI_s1_2", "podium_6WEWI_s1_2"},
         )
-        self.assertTrue(all(coll == "config" and pk == "podium" for coll, _, pk in created.values()))
+        # In the podium's own container (#338), never in `config`.
+        self.assertTrue(all(coll == "podium" and pk == "podium" for coll, _, pk in created.values()))
+        self.assertNotIn("config", fake.queried)
         self.assertEqual(created["podium_6EWI_s1_1"][1]["uid"], "u1")
         self.assertEqual(created["podium_6WEWI_s1_2"][1]["uid"], "u3")
         # Claimed by an app between the read and the write: it stays theirs.

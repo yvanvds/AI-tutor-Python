@@ -8,7 +8,10 @@
 //   - Entra: `authServiceProvider` is overridden with a notifier that is
 //     born signed in. The bypass lives only in this file, which is compiled
 //     into the integration-test entrypoints and never into
-//     `flutter build windows` — there is no flag in `lib/` to flip.
+//     `flutter build windows` — there is no flag in `lib/` to flip. A flow
+//     that lets the start decide (`decideMode`) runs the real `AuthService`
+//     instead, against a faked token endpoint (`entra`), and its database
+//     requests carry the access the app decides on (#336).
 //
 // Also pinned so a run is deterministic and leaves no trace on the machine:
 // the window size (see [AppHarness.windowSize]), the system locale, the
@@ -34,6 +37,7 @@
 // passes `pyRunner:`.
 
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:ai_tutor_python/core/app_mode.dart';
@@ -51,6 +55,7 @@ import 'package:ai_tutor_python/features/shell/app_shell.dart';
 import 'package:ai_tutor_python/features/shell/shell_state.dart';
 import 'package:ai_tutor_python/main.dart';
 import 'package:ai_tutor_python/services/auth/auth_service.dart';
+import 'package:ai_tutor_python/services/auth/cosmos_token_source.dart';
 import 'package:ai_tutor_python/services/config/app_locale.dart';
 import 'package:ai_tutor_python/services/config/theme_service.dart';
 import 'package:ai_tutor_python/services/github/github_device_flow.dart';
@@ -69,6 +74,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:py_runner/py_runner.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -82,10 +88,23 @@ import 'fake_release_server.dart';
 import 'scripted_llm.dart';
 import 'seed.dart';
 
-/// The school's OpenAI key as every flow sees it (#126). Pinned in place of
-/// the build's real `Env.apiKey` so a flow can assert on the key a request
-/// carried without the developer's own key ever appearing in a test.
+/// The fallback for the school's key, as every flow sees it (#126): the
+/// school's key while `config/global` has no `ApiKey` (#337), as in the
+/// seed. Pinned in place of the real `Env.apiKey` so a flow can assert on
+/// the key a request carried without the developer's own key ever appearing
+/// in a test.
 const String kSchoolApiKey = 'sk-school-key';
+
+/// The database key of a harness build with school data (#336): any valid
+/// base64, never the developer's own. A build without school data has CI's
+/// placeholder instead.
+final String _kBuildDatabaseKey = base64Encode(utf8.encode('harness-database'));
+
+/// The Entra token endpoint when a flow passes none: every request fails
+/// loudly, and nothing leaves the machine.
+final http.Client _noEntra = MockClient(
+  (request) async => throw StateError('no Entra in this flow: ${request.url}'),
+);
 
 /// A plain school morning (#235): Wednesday 16 September 2026, 10:00 local
 /// time. No weekend, no night, no early morning, no Friday afternoon, no
@@ -196,6 +215,7 @@ class AppHarness {
     this.buildSchool,
     this.schoolData,
     this.schoolFilePicker,
+    this.entra,
     this.updateFeedUrl,
     this.forceUpdateCheck = true,
     this.nativeGet,
@@ -211,6 +231,7 @@ class AppHarness {
     this.githubOAuthClientId,
     this.llm,
     this.openaiClient,
+    this.fallbackSchoolKey = true,
     this.developerTools,
     this.supervision,
     this.turnClockStart,
@@ -243,7 +264,7 @@ class AppHarness {
 
   /// The content bundle the stand-alone app loads at start (#266), as
   /// `main()` loads the one in its assets. `null` (the default) is the app's
-  /// own assets, which hold no bundle until the first export. Only with
+  /// own assets: the bundle exported from the live content (#265). Only with
   /// [localData].
   final CurriculumBundleSource? curriculumBundle;
 
@@ -253,10 +274,18 @@ class AppHarness {
   /// asks. [appMode] does not apply. Whatever the mode, the real
   /// `AuthService` runs, so a school without a stored sign-in shows the
   /// sign-in screen. Stand-alone needs [localData].
+  ///
+  /// A school's database is still the seeded in-memory one, but every
+  /// request to it carries the access the app itself decides on
+  /// (`CosmosClient.schoolAuth`, #336), recorded in
+  /// `cosmos.authorizations`: the database key, or a token from the sign-in
+  /// through [entra].
   final bool decideMode;
 
   /// The build's own school, for [decideMode]. `null` (the default) is a
-  /// build without one.
+  /// build without one. It also says whether the build has school data
+  /// (#336): with a school, a school on the database key gets a fixed test
+  /// key; without, CI's placeholder, and every school uses the sign-in.
   final SchoolConfig? buildSchool;
 
   /// The app-data folder the school file is kept in (#307). `null` (the
@@ -266,6 +295,12 @@ class AppHarness {
   /// What the school-file dialog hands the app (#307). `null` (the default)
   /// answers as if the dialog was cancelled: never the OS dialog.
   final SchoolFilePicker? schoolFilePicker;
+
+  /// Entra's token endpoint, faked, for [decideMode] (#336): the stored
+  /// sign-in's refresh at start, and the token for the database when the
+  /// school reaches it with the sign-in. `null` (the default) fails every
+  /// request loudly: no flow ever reaches the real Entra.
+  final http.Client? entra;
 
   /// The mode the app started in, once it has.
   AppMode? startedMode;
@@ -401,13 +436,20 @@ class AppHarness {
   /// Where [llm] swaps the connectors for a scripted stand-in, this leaves
   /// the production wiring in place — the tutor's connector, the grade
   /// justification's and the Test button's, each built the way `lib/`
-  /// builds it, resolving its key through `tutorApiKeyProvider` — and only
-  /// replaces the socket underneath, through `openaiClientProvider`. Pass a
-  /// `FakeOpenAi().client` (test/helpers) to read back every request the
-  /// real app made, header and body, and to answer it. Mounting the practice
-  /// editor then really asks the model for an exercise, so the client has to
-  /// be ready to answer one.
+  /// builds it, resolving its key through `resolveTutorApiKeyProvider` — and
+  /// only replaces the socket underneath, through `openaiClientProvider`.
+  /// Pass a `FakeOpenAi().client` (test/helpers) to read back every request
+  /// the real app made, header and body, and to answer it. Mounting the
+  /// practice editor then really asks the model for an exercise, so the
+  /// client has to be ready to answer one.
   final http.Client? openaiClient;
+
+  /// Whether there is a fallback for the school's key (#337):
+  /// [kSchoolApiKey], for a `config/global` without `ApiKey`. `false` is a
+  /// build without school data (#308, step 3), which has none: the school's
+  /// key is `ApiKey` or nothing. Never the developer's real key either
+  /// way.
+  final bool fallbackSchoolKey;
 
   /// Whether developer-only surfaces (the instructions editor, the developer
   /// card and — on its own — the AI model card in Options) are exposed.
@@ -585,7 +627,22 @@ class AppHarness {
         source: curriculumBundle,
       );
     } else {
-      cosmos = InMemoryCosmosClient(seedCosmos(identity))..install();
+      // As `bootApp` reaches the school's database (#336): the access the
+      // app decides on for this school in this build, in front of the
+      // in-memory one.
+      final hasSchoolData = buildSchool != null;
+      final auth = decideMode && mode is SchoolMode
+          ? CosmosClient.schoolAuth(
+              mode,
+              databaseKey: () => hasSchoolData ? _kBuildDatabaseKey : 'dummy',
+              schoolDataInBuild: () => hasSchoolData,
+              tokenSource: CosmosTokenSource.forMode(
+                mode,
+                httpClient: entra ?? _noEntra,
+              ),
+            )
+          : null;
+      cosmos = InMemoryCosmosClient(seedCosmos(identity), auth)..install();
       for (final entry in extraDocs.entries) {
         final store = cosmos[entry.key];
         // `translations` is partitioned on a doc field (#206): a write names
@@ -609,8 +666,10 @@ class AppHarness {
           authServiceProvider.overrideWith(() => _SignedInAuth(identity)),
         // Never the build's real key (#126): the school-key account's calls
         // are asserted against this string, and a developer's own key must
-        // not leak into a test.
-        schoolApiKeyProvider.overrideWithValue(kSchoolApiKey),
+        // not leak into a test. `null` is no fallback at all (#337).
+        fallbackSchoolApiKeyProvider.overrideWithValue(
+          fallbackSchoolKey ? kSchoolApiKey : null,
+        ),
         if (openaiClient != null)
           // The production connectors, over a scripted socket.
           openaiClientProvider.overrideWithValue(openaiClient)
@@ -692,11 +751,14 @@ class AppHarness {
     );
 
     // The stored local profile or sign-in, before the first frame, as in
-    // `main()`.
+    // `main()`. A sign-in is refreshed with [entra], never the real one.
     if (realAuth) {
-      await container
-          .read(authServiceProvider.notifier)
-          .tryAcquireTokenSilent();
+      await http.runWithClient(
+        () => container
+            .read(authServiceProvider.notifier)
+            .tryAcquireTokenSilent(),
+        () => entra ?? _noEntra,
+      );
     }
 
     return container;

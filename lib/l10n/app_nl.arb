@@ -844,6 +844,7 @@
   "chat_notice_ownKeyMissing": "Er is geen OpenAI API-sleutel opgeslagen op dit toestel. Voeg de jouwe toe via Opties → OpenAI API-sleutel.",
   "chat_notice_ownKeyRejected": "OpenAI heeft je API-sleutel geweigerd. Controleer ze via Opties → OpenAI API-sleutel.",
   "chat_notice_schoolKeyInvalid": "De OpenAI API-sleutel van de school werkt niet. Laat het je leerkracht weten.",
+  "chat_notice_schoolKeyMissing": "Je school heeft nog geen OpenAI API-sleutel ingesteld. Laat het je leerkracht weten.",
   "chat_notice_noPreviousRequest": "Geen vorige aanvraag om opnieuw te proberen.",
   "chat_notice_emptyResponse": "Lege respons van de tutor.",
   "chat_notice_unparseableResponse": "Kon respons niet verwerken: {raw}",
@@ -1147,5 +1148,5 @@
   "options_school_leave_cancel": "Annuleren",
   "options_school_standalone": "Zit je op een school? Importeer het bestand van je school. Wat je hier deed, blijft op deze pc.",
   "options_school_import": "Schoolbestand importeren",
-  "auth_localKey_schoolEscape": "Zit je op een school? Importeer het bestand van je school."
+  "auth_localKey_schoolEscape": "Zit je op een school? Importeer het schoolbestand dat je van je leerkracht krijgt."
 }

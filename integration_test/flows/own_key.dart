@@ -18,6 +18,12 @@
 //     request: the tutor does not re-send a turn a key problem failed
 //     (#134).
 //
+// And where the school's key comes from (#337): `ApiKey` on the school's
+// `config/global` when it is filled in, over the fallback; the fallback
+// while the field is empty (the seed, as above); and with neither — a build
+// without school data — no request at all, and a chat pill and a Test
+// button that say the school has no key.
+//
 // Run (all flows, one app process — see app_test.dart):
 //   flutter test integration_test -d windows
 // Run just this flow:
@@ -46,6 +52,17 @@ const String _ownKey = 'sk-typed-at-the-gate';
 
 /// A key a previous own-key session left in SharedPreferences.
 const String _strayKey = 'sk-left-over';
+
+/// `ApiKey` on the school's `config/global` (#337).
+const String _configKey = 'sk-from-config-global';
+
+/// The seeded `config/global` with [apiKey] filled in.
+Map<String, dynamic> _configDoc(String apiKey) => {
+  'id': 'global',
+  'type': 'config',
+  'Model': 'gpt-4o',
+  'ApiKey': apiKey,
+};
 
 /// The exercise the (fake) model hands out: what the practice editor shows
 /// once the request came back, and the proof the call went through.
@@ -162,6 +179,8 @@ void main() {
       'on the device is ignored', (tester) async {
     // The seeded account has `mayUseGlobalKey`; the stray key is what an
     // earlier own-key session, or a teacher's toggle since, leaves behind.
+    // The seeded `config/global` has an empty `ApiKey`, so the school's key
+    // is the fallback (#337).
     final harness = AppHarness(
       openaiClient: openai.client,
       prefs: const {'local_api_key': _strayKey},
@@ -252,6 +271,83 @@ void main() {
     );
     expect(openai.requests.length, probed + 1);
     expect(openai.bearers.last, 'Bearer $_ownKey');
+
+    await harness.dispose(tester);
+  });
+
+  testWidgets("the school's key comes from config/global, not from the "
+      'fallback (#337)', (tester) async {
+    final harness = AppHarness(
+      openaiClient: openai.client,
+      extraDocs: {
+        'config': [_configDoc(_configKey)],
+      },
+    );
+    await harness.boot(tester);
+
+    await _openPractice(tester);
+    await _pumpUntilRequested(tester, openai);
+
+    // The real tutor's request, on the key the school set, while there is
+    // a fallback too.
+    expect(openai.bearers, ['Bearer $_configKey']);
+
+    await pumpUntil(
+      tester,
+      () => _editorText(tester).contains('___'),
+      timeout: const Duration(seconds: 30),
+      reason: 'the exercise never reached the editor',
+    );
+    expect(_editorText(tester), _exerciseCode);
+
+    await harness.dispose(tester);
+  });
+
+  testWidgets('a school without a key, and no fallback, sends nothing and '
+      'says so in the chat and under the Test button (#337)', (tester) async {
+    final harness = AppHarness(
+      openaiClient: openai.client,
+      fallbackSchoolKey: false,
+    );
+    await harness.boot(tester);
+
+    await _openPractice(tester);
+
+    const missing =
+        'Your school has not set an OpenAI API key yet. Let your teacher '
+        'know.';
+    const expected = 'Something went wrong with the tutor: $missing';
+    await pumpUntil(
+      tester,
+      () => _pills(tester).contains(expected),
+      timeout: const Duration(seconds: 30),
+      reason: 'no pill said the school has no key; pills: ${_pills(tester)}',
+    );
+    await pumpUntil(
+      tester,
+      () => harness.container.read(tutorServiceProvider) == TutorState.idle,
+      timeout: const Duration(seconds: 30),
+      reason: 'the tutor never went idle after the refused call',
+    );
+    // One pill, and not a single request: there was no key to send.
+    expect(_pills(tester).where((p) => p == expected).length, 1);
+    expect(openai.requests, isEmpty);
+
+    // The Test button runs on the same key, and says the same.
+    await tester.tap(find.byTooltip('Options'));
+    await pumpUntilFound(tester, find.byType(OptionsPage));
+    await _scrollAndTap(tester, find.text('Another model on this device'));
+    final field = find.byKey(const ValueKey('model-field-device'));
+    await pumpUntilFound(tester, field);
+    await _scrollAndTap(tester, field);
+    await tester.enterText(field, 'gpt-4o');
+    await tester.pump();
+    await _scrollAndTap(
+      tester,
+      find.byKey(const ValueKey('model-test-device')),
+    );
+    await pumpUntilFound(tester, find.text('Test failed: $missing'));
+    expect(openai.requests, isEmpty);
 
     await harness.dispose(tester);
   });

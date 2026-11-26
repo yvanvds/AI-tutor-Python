@@ -68,6 +68,7 @@ const Map<String, String> kCosmosPartitionKeyFields = {
   'questions': 'subgoalId',
   'translations': 'language',
   'turn_content': 'uid',
+  'podium': 'type',
 };
 
 /// Where the stand-alone mode keeps its data:

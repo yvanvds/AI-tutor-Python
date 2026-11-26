@@ -87,8 +87,9 @@
         <div class="notice">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 11v5M12 8v.01" /></svg>
           <p>
-            <strong class="notice-title">Vandaag alleen voor SMA Arcadia</strong>
-            De app werkt nu alleen met de schoolaccounts van SMA Arcadia.
+            <strong class="notice-title">Ook in je eigen school</strong>
+            De app werkt met het schoolbestand van je school. Je school richt daarvoor één keer een eigen omgeving in.
+            Zonder school werkt de app ook: dan oefent een leerling alleen.
             Wat je nodig hebt om ze in je eigen school te gebruiken, lees je onder
             <a href="#eigen-school">In je eigen school</a>.
           </p>
@@ -579,14 +580,15 @@
       </div>
     </section>
 
-    <!-- 6. In je eigen school: today Arcadia only; README; #261; an issue. -->
+    <!-- 6. In je eigen school: what a school sets up (README), stand-alone
+         (#261), the school file (#307), an issue. -->
     <section class="section" id="eigen-school" aria-labelledby="eigen-school-heading">
       <div class="wrap">
         <span class="section-label">In je eigen school</span>
         <h2 class="section-heading" id="eigen-school-heading">Kun je de app vandaag gebruiken?</h2>
         <p class="section-lead">
-          Nog niet zomaar. De app die je op deze site downloadt, werkt alleen met de schoolaccounts van SMA Arcadia.
-          Met een account van een andere school kom je niet voorbij het aanmelden.
+          Ja, als je school ze één keer inricht. De app die je op deze site downloadt, heeft geen vaste school:
+          het schoolbestand zegt met welke school ze werkt. Zonder schoolbestand oefent een leerling alleen.
         </p>
 
         <div class="card-grid">
@@ -594,10 +596,11 @@
             <div class="card-icon" aria-hidden="true">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 6.5a4 4 0 0 0-5 5L4 17v3h3l5.5-5.5a4 4 0 0 0 5-5L15 12l-3-3z" /></svg>
             </div>
-            <h3 class="card-title">Zelf bouwen</h3>
+            <h3 class="card-title">Je school inrichten</h3>
             <p>
-              Wil je de app nu al in je school? Dan bouw je een eigen versie, met de Microsoft-accounts van je school, een eigen database en een eigen OpenAI-account.
-              Code schrijven hoeft niet, maar je werkt wel in de Azure-portal en in PowerShell.
+              Je school heeft een app-registratie in Microsoft Entra nodig, een eigen database in Azure Cosmos DB en een eigen OpenAI-sleutel.
+              In de database zet je de doelen, de lessen en de instructies. Een beheerder geeft de app toestemming in Microsoft Entra, en de leerlingen en de leerkrachten hun rollen in de database.
+              Een eigen versie bouwen hoeft niet, en code schrijven ook niet. Je werkt wel in de Azure-portal en in PowerShell.
             </p>
             <p><a href="https://github.com/yvanvds/AI-tutor-Python#readme" hreflang="en">De README op GitHub</a> beschrijft het stap voor stap, in het Engels.</p>
           </article>
@@ -606,10 +609,11 @@
             <div class="card-icon card-icon-info" aria-hidden="true">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="2" /><path d="M8 20h8M12 16v4" /></svg>
             </div>
-            <h3 class="card-title">Zonder schoolaccount</h3>
+            <h3 class="card-title">Zonder school</h3>
             <p>
-              Een versie die je zonder schoolaccount gebruikt, is in voorbereiding.
-              Je volgt ze in <a href="https://github.com/yvanvds/AI-tutor-Python/issues/261">#261 op GitHub</a>.
+              Kiest een leerling bij de eerste start <strong>Zonder school verder</strong>, dan oefent hij alleen, met een eigen OpenAI-sleutel.
+              Alles blijft op zijn pc: niemand anders ziet zijn voortgang.
+              Het deel <strong>Docent</strong>, de <strong>Puntenformule</strong> en <strong>Mijn rapporten</strong> zijn er dan niet.
             </p>
           </article>
 
@@ -619,11 +623,11 @@
             </div>
             <h3 class="card-title">Een schoolbestand</h3>
             <p>
-              In een volgende versie stelt een school de app in met een schoolbestand: een klein JSON-bestand met de naam van de school, de tenant en de client-id van haar app-registratie, en het adres en de naam van haar database.
+              Een school stelt de app in met een schoolbestand: een klein JSON-bestand met de naam van de school, de tenant en de client-id van haar app-registratie, en het adres en de naam van haar database.
               Er staan geen sleutels of wachtwoorden in. De school maakt het één keer en verdeelt het, bijvoorbeeld via het leerplatform.
               Bij de eerste start kiest de leerling het bestand en meldt zich aan.
             </p>
-            <p>Vandaag bestaat alleen de opzet van SMA Arcadia. Wat een andere school zelf moet inrichten, staat in de README.</p>
+            <p>De OpenAI-sleutel van de school staat in haar eigen database. Zo betaalt elke school haar eigen gebruik.</p>
           </article>
 
           <article class="card">

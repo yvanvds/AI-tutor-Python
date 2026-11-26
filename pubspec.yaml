@@ -105,8 +105,8 @@ flutter:
     - docs/puntenformule-leerlingen.nl.md
     - docs/puntenformule-leerlingen.en.md
     # The content the stand-alone mode ships with (#266), written by
-    # tooling/curriculum/export_bundle.py (#265). Holds only a README until
-    # the first export is reviewed; the app then starts without content.
+    # tooling/curriculum/export_bundle.py (#265) from the live content; the
+    # README there says how to refresh it.
     - assets/curriculum/
 
 

@@ -96,9 +96,9 @@ class _Accounts221 extends AccountService {
   void poll(Map<String, dynamic> doc) => state = Account.fromMap(doc);
 }
 
-/// The podium's config container, whose creates can be made to fail.
-class _Config implements CosmosContainer {
-  _Config(this.inner);
+/// The podium's container (#338), whose creates can be made to fail.
+class _Podium implements CosmosContainer {
+  _Podium(this.inner);
   final CosmosContainer inner;
   bool down = false;
 
@@ -189,8 +189,8 @@ void main() {
   late _History history;
   late ProviderContainer pc;
   var classes = ClassList.empty;
-  late InMemoryCosmos config;
-  late _Config configContainer;
+  late InMemoryCosmos podiumStore;
+  late _Podium podiumContainer;
 
   void seedAccount({String className = '', Map<String, dynamic>? badges}) {
     accounts = InMemoryCosmos([
@@ -223,7 +223,7 @@ void main() {
         ),
         turnHistoryServiceProvider.overrideWithValue(history),
         classPodiumProvider.overrideWithValue(
-          ClassPodium(container: configContainer),
+          ClassPodium(container: podiumContainer),
         ),
         goalsServiceProvider.overrideWithValue(
           GoalsService(container: goals.container),
@@ -254,10 +254,8 @@ void main() {
   setUp(() {
     classes = ClassList.empty;
     goals = InMemoryCosmos();
-    config = InMemoryCosmos.partitioned('type', [
-      {'id': 'global', 'type': 'config'},
-    ]);
-    configContainer = _Config(config.container);
+    podiumStore = InMemoryCosmos.partitioned('type');
+    podiumContainer = _Podium(podiumStore.container);
     seedAccount();
     seedTurns(const []);
   });
@@ -490,7 +488,7 @@ void main() {
     };
 
     Map<String, dynamic>? podiumDoc(int place) =>
-        config['podium/podium_6EWI_s1_$place'];
+        podiumStore['podium/podium_6EWI_s1_$place'];
 
     void seedVariables() => goals = InMemoryCosmos([
       {'id': 'r1', 'type': 'goal', 'title': 'Basis', 'order': 0},
@@ -509,7 +507,7 @@ void main() {
       seedAccount(className: '6EWI', badges: earnedAlready);
       seedTurns([for (var i = 0; i < 10; i++) _turn(i)]);
       // Someone else was first.
-      config.create({
+      podiumStore.create({
         ...PodiumPlace(
           className: '6EWI',
           subgoalId: 's1',
@@ -545,7 +543,7 @@ void main() {
       seedVariables();
       seedAccount(className: '6EWI', badges: earnedAlready);
       seedTurns([for (var i = 0; i < 10; i++) _turn(i)]);
-      config.create({
+      podiumStore.create({
         ...PodiumPlace(
           className: '6EWI',
           subgoalId: 's1',
@@ -631,7 +629,7 @@ void main() {
         'summary of the first look', () async {
       seedAccount(className: '6EWI');
       seedTurns([for (var i = 0; i < 12; i++) _turn(i, advanced: i == 5)]);
-      config.create(
+      podiumStore.create(
         PodiumPlace(
           className: '6EWI',
           subgoalId: 's1',
@@ -661,14 +659,14 @@ void main() {
         seedTurns([for (var i = 0; i < 10; i++) _turn(i)]);
         start();
         await until(() => pc.read(badgeServiceProvider)?.facts != null);
-        configContainer.down = true;
+        podiumContainer.down = true;
         await pc
             .read(badgeServiceProvider.notifier)
             .afterTurn(_turn(10, advanced: true));
         expect(podiumDoc(1), isNull);
         expect(storedBadges()!.containsKey('podium:s1'), isFalse);
 
-        configContainer.down = false;
+        podiumContainer.down = false;
         await pc.read(badgeServiceProvider.notifier).afterTurn(_turn(11));
         expect(podiumDoc(1)!['uid'], _uid);
         expect(

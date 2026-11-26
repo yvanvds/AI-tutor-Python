@@ -31,6 +31,8 @@ extension ChatNoticeText on AppLocalizations {
         return chat_notice_ownKeyRejected;
       case ChatNoticeKind.schoolKeyInvalid:
         return chat_notice_schoolKeyInvalid;
+      case ChatNoticeKind.schoolKeyMissing:
+        return chat_notice_schoolKeyMissing;
       case ChatNoticeKind.noPreviousRequest:
         return chat_notice_noPreviousRequest;
       case ChatNoticeKind.emptyResponse:

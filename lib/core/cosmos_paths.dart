@@ -20,10 +20,97 @@ const String _reportsContainer = 'reports';
 const String _questionsContainer = 'questions';
 const String _translationsContainer = 'translations';
 const String _turnContentContainer = 'turn_content';
+const String _podiumContainer = 'podium';
+
+/// What a student's session does in a container, for the roles of access
+/// with the user's own sign-in (#306).
+///
+/// With that access Cosmos itself decides what a user may do, and a role
+/// reaches a whole container: never a partition or a single document.
+/// Teachers get [readWrite] on the whole database.
+enum StudentAccess {
+  /// A student's session writes here (create, upsert, replace, delete or a
+  /// transactional batch): Cosmos DB Built-in Data Contributor.
+  readWrite,
+
+  /// A student's session only reads here; every write is in the teacher's
+  /// pages: Cosmos DB Built-in Data Reader.
+  read,
+
+  /// A student's session never opens it: no role.
+  none,
+}
+
+/// The role list per container (#306), worked out from the code: which
+/// service opens the container, and where its writes are called from. A
+/// write in a page that only a teacher sees (`Section.isTeacherOnly`) or
+/// behind `isTeacherProvider` leaves a container at [StudentAccess.read];
+/// one in the tutor, Practice, the Playground or Options makes it
+/// [StudentAccess.readWrite].
+///
+/// The app does not read this: it is the list an administrator assigns the
+/// roles from (README, "Access with the user's own sign-in").
+/// `test/core/cosmos_student_access_test.dart` fails when a container above
+/// has no entry here, or when the README's table or commands say otherwise.
+/// A change that makes a student's session write a [StudentAccess.read]
+/// container, or open a [StudentAccess.none] one, changes its entry here,
+/// and then the README.
+const Map<String, StudentAccess> kStudentAccess = {
+  // `AccountService`: the profile at the first sign-in (`upsertAccount`),
+  // then the streak, the calibration and `oefeningCount`, and the badges
+  // after each oefening. Teacher-only (Students page): the KEY switch, the
+  // class, a teacher badge, deleting an account.
+  _accountsContainer: StudentAccess.readWrite,
+  // `ProgressService.upsert` after a graded answer; a reset or an import in
+  // Options deletes and writes.
+  _progressContainer: StudentAccess.readWrite,
+  // A sample per `ProgressService.upsert`; the import in Options.
+  _progressHistoryContainer: StudentAccess.readWrite,
+  // `ReportService.updateForCurrentChildGoal`, from the conductor.
+  _statusReportsContainer: StudentAccess.readWrite,
+  // `LoBeliefsService.upsert`, from the conductor; reset and import.
+  _loBeliefsContainer: StudentAccess.readWrite,
+  // `TurnHistoryService.append` and `appendAudit` per graded answer; the
+  // reset deletes. Teacher-only: `acknowledgeAllFor` (Students page).
+  _turnHistoryContainer: StudentAccess.readWrite,
+  // `TurnContentService.record` after each oefening; the reset deletes.
+  _turnContentContainer: StudentAccess.readWrite,
+  // `PlaygroundFilesService.upsert`: a saved file, or a delete's tombstone.
+  _playgroundFilesContainer: StudentAccess.readWrite,
+  // Shared by all students. `QuestionBankService.recordAsked` creates a
+  // question, `recordFirstAnswer` and `recordAnswer` count answers (and may
+  // hide one). Teacher-only (Questions page): hide, show, delete.
+  _questionsContainer: StudentAccess.readWrite,
+  // Shared by all students. `ClassPodium.claim` creates a place (#338).
+  _podiumContainer: StudentAccess.readWrite,
+  // The tutor and the Leerpad read it. Writes: Goals and Lesson content.
+  _goalsContainer: StudentAccess.read,
+  // The tutor reads it. Writes: Instructions.
+  _instructionsContainer: StudentAccess.read,
+  // `global` (`GlobalConfigService`) and `classes` (`ClassesService
+  // .readOnce`, the timetable). Writes: the school's model in Options
+  // (`_GlobalModelCard`, behind `isTeacherProvider`) and Classes.
+  _configContainer: StudentAccess.read,
+  // Explain, the tutor and the reference read the lessons. Writes: Lesson
+  // content.
+  _contentContainer: StudentAccess.read,
+  // The translations of lessons and goal texts. Writes: Goals and Lesson
+  // content.
+  _translationsContainer: StudentAccess.read,
+  // The conductor reads them (`getMilestones`). Writes: Milestones.
+  _milestonesContainer: StudentAccess.read,
+  // My reports reads the student's own (`watchForUser`). Writes: Reports
+  // (publish, republish).
+  _reportsContainer: StudentAccess.read,
+  // Only the teacher's Lesson content page reads and writes it.
+  _modulesContainer: StudentAccess.none,
+  // Only the teacher's Milestones and Reports pages.
+  _gradeProposalsContainer: StudentAccess.none,
+};
 
 /// Constant partition-key values for the `/type` containers (`goals`,
-/// `instructions`, `config`, `content`, `modules`, `milestones`). Each doc in
-/// those containers carries a `type` field with this exact value.
+/// `instructions`, `config`, `content`, `modules`, `milestones`, `podium`).
+/// Each doc in those containers carries a `type` field with this exact value.
 class CosmosPartitions {
   static const String goal = 'goal';
   static const String instruction = 'instruction';
@@ -32,7 +119,8 @@ class CosmosPartitions {
   static const String module = 'module';
   static const String milestone = 'milestone';
 
-  /// The class podium (#221), the second partition of `config`.
+  /// The class podium (#221): the one partition of the `podium` container
+  /// (#338). Before, the second partition of `config`.
   static const String podium = 'podium';
 }
 
@@ -64,16 +152,12 @@ class CosmosPaths {
   static CosmosContainer instructions() =>
       _client.container(_instructionsContainer);
 
-  /// `/type` partition. Two partitions:
-  ///
-  ///   - `"config"`: two docs, `global` (the school settings) and `classes`
-  ///     (the classes and their lessons, #218);
-  ///   - `"podium"`: the class podium (#221), three docs per class and
-  ///     subgoal at most, `podium_{class}_{subgoal}_{1|2|3}`
-  ///     (`CosmosDocId.podium`), each claimed with a `create` that never
-  ///     overwrites. Its own partition so the podium never shares one with
-  ///     the settings every app polls; no container of its own, so no step
-  ///     in the README.
+  /// `/type` partition (`"config"`). Two docs, `global` (the school
+  /// settings) and `classes` (the classes and their lessons, #218). Students
+  /// only read it: the class podium, which they write, has its own container
+  /// since #338 ([podium]). An older deployment still has the podium's docs
+  /// here, in the partition `"podium"`, until the teacher removes them after
+  /// `tooling/badges/podium_copy.py` copied them over.
   static CosmosContainer config() => _client.container(_configContainer);
 
   /// `/type` partition (always `"content"`). One doc per authored
@@ -146,4 +230,13 @@ class CosmosPaths {
   /// the teacher's tooling (`evaluate.py trace`).
   static CosmosContainer turnContent() =>
       _client.container(_turnContentContainer);
+
+  /// `/type` partition (always `"podium"`). The class podium (#221): three
+  /// docs per class and subgoal at most, `podium_{class}_{subgoal}_{1|2|3}`
+  /// (`CosmosDocId.podium`), each claimed with a `create` that never
+  /// overwrites, with the student's uid and nothing else about them. Its
+  /// own container (#338), not a partition of `config`: with the user's own
+  /// sign-in (#306) a role reaches a whole container, so students can write
+  /// here and only read `config`.
+  static CosmosContainer podium() => _client.container(_podiumContainer);
 }

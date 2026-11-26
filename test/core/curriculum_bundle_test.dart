@@ -10,6 +10,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 
 import '../helpers/delete_dir.dart';
+import '../helpers/in_memory_cosmos.dart';
 
 final Directory _fixture = Directory('test/fixtures/curriculum_bundle');
 
@@ -231,14 +232,103 @@ void main() {
     expect(await ids(client, 'goals'), {'variabelen', 'toekennen'});
   });
 
-  test('the assets of this build hold no bundle yet: the start loads '
-      'nothing', () async {
-    final client = open();
-    expect(
-      await installCurriculumBundleAtStart(client: client, localDataRoot: data),
-      CurriculumInstall.noBundle,
-    );
-    expect(await ids(client, 'goals'), isEmpty);
+  group('the bundle in the assets of this build (#265)', () {
+    final shipped = Directory(kCurriculumAssetDir);
+    Map<String, dynamic> shippedJson(String name) =>
+        jsonDecode(File(p.join(shipped.path, name)).readAsStringSync())
+            as Map<String, dynamic>;
+
+    // In memory: writing every doc to its own file takes a while (#346).
+    // The integration flow `app_mode` loads it into the local storage on
+    // disk, as a user's first start does.
+    test('the first start loads all of it, the next start nothing', () async {
+      final manifest = shippedJson('manifest.json');
+      final counts = {
+        for (final MapEntry(:key, :value)
+            in (manifest['containers'] as Map).entries)
+          key as String: (value as Map)['count'] as int,
+      };
+      expect(counts.keys, containsAll(['goals', 'content', 'instructions']));
+      expect(counts['goals'], greaterThan(0));
+
+      final client = InMemoryCosmosClient();
+      Future<List<Map<String, dynamic>>> stored(String container) => client
+          .container(container)
+          .query('SELECT * FROM c', crossPartition: true);
+      expect(
+        await installCurriculumBundleAtStart(
+          client: client,
+          localDataRoot: data,
+        ),
+        CurriculumInstall.installed,
+      );
+      for (final MapEntry(:key, :value) in counts.entries) {
+        expect((await stored(key)).length, value, reason: key);
+      }
+      final questions = await stored('questions');
+      expect(questions.every((q) => q[kFromBundleField] == true), isTrue);
+      expect(jsonDecode(curriculumVersionFile(data).readAsStringSync()), {
+        'contentVersion': manifest['contentVersion'],
+      });
+
+      // The next start.
+      expect(
+        await installCurriculumBundleAtStart(
+          client: client,
+          localDataRoot: data,
+        ),
+        CurriculumInstall.upToDate,
+      );
+    });
+
+    test('holds only content: no student container, no school setting, no '
+        'Cosmos field', () {
+      final manifest = shippedJson('manifest.json');
+      final containers = (manifest['containers'] as Map).cast<String, Map>();
+      expect(containers.keys.toSet(), {
+        ...kBundleOwnedContainers,
+        'config',
+        'questions',
+      });
+      final config = shippedJson('config.json')['docs'] as List;
+      for (final doc in config.cast<Map<String, dynamic>>()) {
+        expect(doc['id'], 'global');
+        // Built from a list in the exporter: the model and the question
+        // bank's mix, never the school's key or its other settings.
+        expect(
+          {
+            'id',
+            'type',
+            'Model',
+            'QuestionBankMinimum',
+            'QuestionBankShare',
+          }.containsAll(doc.keys),
+          isTrue,
+          reason: '${doc.keys}',
+        );
+      }
+      final keyLike = RegExp(
+        r'apikey|api_key|secret|password|token|accountkey|connectionstring',
+        caseSensitive: false,
+      );
+      for (final MapEntry(:key, :value) in containers.entries) {
+        final docs = shippedJson(value['file'] as String)['docs'] as List;
+        expect(docs.length, value['count'], reason: key);
+        for (final doc in docs.cast<Map<String, dynamic>>()) {
+          final where = '$key/${doc['id']}';
+          expect(
+            doc.keys.where((k) => k.startsWith('_')),
+            isEmpty,
+            reason: where,
+          );
+          expect(doc.keys.where(keyLike.hasMatch), isEmpty, reason: where);
+          if (key == 'questions') {
+            expect(doc.containsKey('createdByUid'), isFalse, reason: where);
+            expect(doc['status'], 'active', reason: where);
+          }
+        }
+      }
+    });
   });
 
   test('a broken bundle does not stop the start', () async {

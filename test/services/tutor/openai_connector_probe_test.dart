@@ -54,6 +54,7 @@ void main() {
   /// [respond].
   OpenaiConnector connector(http.Response Function(http.Request) respond) =>
       OpenaiConnector(
+        getApiKey: () => const SchoolKey('sk-test'),
         client: MockClient((req) async {
           requests.add(req);
           return respond(req);

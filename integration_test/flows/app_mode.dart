@@ -7,10 +7,11 @@
 // app's own local storage (`LocalCosmosClient`) over a temp folder, with the
 // real `AuthService`. A second start goes straight to the shell.
 //
-// The content the app ships with (#266) is loaded at start. This build's
-// assets hold no bundle yet, so the first test meets an empty app; the
-// second loads the fixture bundle (test/fixtures/curriculum_bundle) and the
-// student finds its goals on the learning path.
+// The content the app ships with (#266) is loaded at start. The first test
+// runs on this build's own assets, the bundle exported from the live content
+// (#265): the student finds its first goal on the learning path, and the
+// second start loads nothing again. The second test loads the small fixture
+// bundle (test/fixtures/curriculum_bundle) instead.
 //
 // What needs a school is left out of the stand-alone app (#267): no grade
 // formula, no reports, no teacher group in the rail; no lesson badges, class
@@ -30,6 +31,14 @@
 // school file at start: a signed-in student gets the file and stays signed
 // in, the next start writes nothing, and nothing is written after leaving
 // the school or without a school.
+//
+// The release after it (#308, step 3; #336) has no school data. The school
+// file of step 1 says nothing about the access, and still reaches the
+// database: with a token from the stored sign-in, on every request. The
+// student stays signed in, and the file stays as step 1 wrote it. A pc that
+// skipped step 1 has no file: the first-start choice asks and says that the
+// teacher gives the school file, and with that file the stored sign-in still
+// holds. The key screen says it too, for whoever went on without a school.
 //
 // Every other flow runs in school mode (the harness default); this one boots
 // the real app in both.
@@ -54,6 +63,7 @@ import 'package:ai_tutor_python/features/school/first_start_page.dart';
 import 'package:ai_tutor_python/features/shell/app_shell.dart';
 import 'package:ai_tutor_python/features/shell/shell_state.dart';
 import 'package:ai_tutor_python/features/standalone/standalone_welcome_page.dart';
+import 'package:ai_tutor_python/services/auth/cosmos_token_source.dart';
 import 'package:ai_tutor_python/services/badges/badge_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -104,6 +114,32 @@ Future<Set<String>> _seenOn(
   return seen;
 }
 
+/// A file of the bundle in this build's assets (#265).
+Map<String, dynamic> _assetsJson(String name) =>
+    jsonDecode(File('$kCurriculumAssetDir/$name').readAsStringSync())
+        as Map<String, dynamic>;
+
+/// The first root goal of the bundle in the assets and its first subgoal,
+/// by their English titles where the bundle translates them. Read from the
+/// files, so a fresh export needs no change here.
+({String goal, String subgoal}) _firstGoalInAssets() {
+  List<Map<String, dynamic>> docs(String name) =>
+      (_assetsJson(name)['docs'] as List).cast<Map<String, dynamic>>();
+  final goals = docs('goals.json');
+  final english = {
+    for (final t in docs('translations.json'))
+      if (t['language'] == 'en' && t['kind'] == 'goal')
+        t['refId'] as String: t['title'] as String,
+  };
+  Map<String, dynamic> first(Iterable<Map<String, dynamic>> gs) =>
+      gs.reduce((a, b) => (a['order'] as num) <= (b['order'] as num) ? a : b);
+  final root = first(goals.where((g) => g['parentId'] == null));
+  final sub = first(goals.where((g) => g['parentId'] == root['id']));
+  String title(Map<String, dynamic> g) =>
+      english[g['id']] ?? g['title'] as String;
+  return (goal: title(root), subgoal: title(sub));
+}
+
 /// The school-only parts of the trophy case (#267), and one that stays.
 final Map<String, Finder> _trophyParts = {
   'podium': find.byKey(const ValueKey('badges-section-podium')),
@@ -127,14 +163,17 @@ final Map<String, Finder> _optionsParts = {
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
-  testWidgets('without a school: welcome, own key, then the app; a second '
-      'start goes straight to the app', (tester) async {
+  testWidgets('without a school: welcome, own key, then the app with the '
+      'content it ships with; a second start goes straight to the app', (
+    tester,
+  ) async {
     final data = Directory.systemTemp.createTempSync('ai_tutor_standalone_');
     addTearDown(() {
       if (data.existsSync()) data.deleteSync(recursive: true);
     });
 
-    // First start: nothing on the pc yet.
+    // First start: nothing on the pc yet. No `curriculumBundle`: the one in
+    // this build's assets, as `main()` loads it.
     var harness = AppHarness(appMode: const StandaloneMode(), localData: data);
     await harness.boot(tester, waitForShell: false);
 
@@ -153,7 +192,7 @@ void main() {
     await tester.tap(find.text('Save key'));
 
     await pumpUntilFound(tester, find.byType(AppShell));
-    // A while longer: the empty local database does not knock it over.
+    // A while longer: a fresh local database does not knock it over.
     for (var i = 0; i < 20; i++) {
       await tester.pump(const Duration(milliseconds: 50));
     }
@@ -163,6 +202,20 @@ void main() {
     expect(tester.takeException(), isNull);
     // The account landed in the local storage, not anywhere else.
     expect(Directory('${data.path}/accounts').existsSync(), isTrue);
+
+    // The shipped content: the first goal and its first subgoal, in
+    // English (the app's locale here) as the bundle translates them.
+    final (:goal, :subgoal) = _firstGoalInAssets();
+    await tester.tap(find.byTooltip('Learning path'));
+    await pumpUntilFound(tester, find.byType(LeerpadPage));
+    await pumpUntilFound(tester, find.textContaining(goal));
+    await pumpUntilFound(tester, find.textContaining(subgoal));
+    expect(tester.takeException(), isNull);
+    final loaded = curriculumVersionFile(data);
+    expect(jsonDecode(loaded.readAsStringSync()), {
+      'contentVersion': _assetsJson('manifest.json')['contentVersion'],
+    });
+    final loadedAt = loaded.lastModifiedSync();
 
     // What the first start left in shared preferences: the profile, the key.
     final prefs = await SharedPreferences.getInstance();
@@ -185,11 +238,16 @@ void main() {
     expect(find.byType(LocalKeyGateScreen), findsNothing);
     expect(find.text('Hi Alex,'), findsOneWidget);
     expect(tester.takeException(), isNull);
+    // The same bundle again: nothing loaded, the content still there.
+    expect(loaded.lastModifiedSync(), loadedAt);
+    await tester.tap(find.byTooltip('Learning path'));
+    await pumpUntilFound(tester, find.byType(LeerpadPage));
+    await pumpUntilFound(tester, find.textContaining(goal));
 
     await harness.dispose(tester);
   });
 
-  testWidgets('without a school, with the shipped content: after welcome and '
+  testWidgets('without a school, with the fixture content: after welcome and '
       'key the student finds its goals', (tester) async {
     final data = Directory.systemTemp.createTempSync('ai_tutor_standalone_');
     addTearDown(() {
@@ -373,7 +431,17 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('standalone-welcome-start')));
     await pumpUntilFound(tester, find.byType(LocalKeyGateScreen));
 
-    // The way to a school, on the key screen: stored, then a restart.
+    // The way to a school, on the key screen: it says where the school file
+    // comes from (#308), then stored, then a restart.
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('local-key-school-file')),
+        matching: find.text(
+          'At a school? Import the school file your teacher gives you.',
+        ),
+      ),
+      findsOneWidget,
+    );
     await tester.tap(find.byKey(const Key('local-key-school-file')));
     await pumpUntilFound(tester, find.byKey(const Key('school-file-restart')));
     expect(
@@ -523,11 +591,9 @@ void main() {
         buildSchool: build,
         schoolData: appData,
         prefs: prefs,
+        entra: entra,
       );
-      await http.runWithClient(
-        () => harness.boot(tester, waitForShell: false),
-        () => entra,
-      );
+      await harness.boot(tester, waitForShell: false);
       await pumpUntilFound(tester, find.byType(AppShell));
       expect(find.byType(SignInPage), findsNothing, reason: start);
       expect(find.byType(FirstStartPage), findsNothing, reason: start);
@@ -580,6 +646,195 @@ void main() {
     await pumpUntilFound(tester, find.byType(StandaloneWelcomePage));
     expect(harness.startedMode, const StandaloneMode());
     expect(school.existsSync(), isFalse);
+    await harness.dispose(tester);
+  });
+
+  // #336 ------------------------------------------------------------------
+
+  testWidgets('a build without school data: the school file of step 1 '
+      'reaches the database with the sign-in; the student stays signed in, '
+      'with no sign-in screen and no choice', (tester) async {
+    final appData = tempDir('ai_tutor_appdata_');
+    final school = File('${appData.path}/school.json');
+    final build = kTestSchool.named(kBuildSchoolName);
+    final databaseScope =
+        '${CosmosTokenSource.scopeFor(build.databaseEndpoint)} '
+        'offline_access';
+    const databaseToken = 'database-token';
+    bool forDatabase(http.Request r) => r.bodyFields['scope'] == databaseScope;
+    final tokenRequests = <http.Request>[];
+    final entra = MockClient((request) async {
+      tokenRequests.add(request);
+      final database = forDatabase(request);
+      return http.Response(
+        jsonEncode({
+          'access_token': database ? databaseToken : 'sign-in-access',
+          'refresh_token': 'stored-refresh',
+          if (!database)
+            'id_token': _jwt({
+              'oid': studentIdentity.oid,
+              'name': studentIdentity.displayName,
+              'email': studentIdentity.email,
+            }),
+          'expires_in': database ? 4800 : 3600,
+        }),
+        200,
+      );
+    });
+    // Signed in, as every install of the school is.
+    var prefs = <String, Object>{
+      'azure_auth_tokens_v1': jsonEncode({
+        'access_token': 'old-access',
+        'refresh_token': 'stored-refresh',
+        'id_token': null,
+        'access_token_expiry': null,
+      }),
+    };
+
+    // The transitional release (#308, step 1), a build with school data:
+    // it writes the school file, and reaches the database as it always has.
+    var harness = AppHarness(
+      decideMode: true,
+      buildSchool: build,
+      schoolData: appData,
+      prefs: prefs,
+      entra: entra,
+    );
+    await harness.boot(tester, waitForShell: false);
+    await pumpUntilFound(tester, find.byType(AppShell));
+    expect(tokenRequests.where(forDatabase), isEmpty);
+    expect(harness.cosmos.authorizations, isNotEmpty);
+    expect(
+      harness.cosmos.authorizations,
+      everyElement(startsWith(Uri.encodeComponent('type=master&ver=1.0&'))),
+    );
+    final written = school.readAsStringSync();
+    final writtenAt = school.lastModifiedSync();
+    expect(jsonDecode(written), isNot(contains('databaseAccess')));
+    final kept = await SharedPreferences.getInstance();
+    prefs = {for (final key in kept.getKeys()) key: kept.get(key)!};
+    await harness.dispose(tester);
+
+    // The release after it (#308, step 3), a build without school data,
+    // on the same pc.
+    harness = AppHarness(
+      decideMode: true,
+      schoolData: appData,
+      prefs: prefs,
+      entra: entra,
+    );
+    await harness.boot(tester, waitForShell: false);
+    await pumpUntilFound(tester, find.byType(AppShell));
+    expect(find.byType(SignInPage), findsNothing);
+    expect(find.byType(FirstStartPage), findsNothing);
+    expect(find.byTooltip('Sign out'), findsOneWidget);
+    expect(find.text('Hi ${studentIdentity.firstName},'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    // The school from the file, as the file says it.
+    expect(harness.startedMode, SchoolMode(build));
+
+    // One token for the database, silently, with the stored refresh token,
+    // from the school's own tenant and app registration.
+    final database = tokenRequests.where(forDatabase).toList();
+    expect(database, hasLength(1));
+    expect(database.single.url.path, contains(build.tenantId));
+    expect(database.single.bodyFields['grant_type'], 'refresh_token');
+    expect(database.single.bodyFields['refresh_token'], 'stored-refresh');
+    expect(database.single.bodyFields['client_id'], build.clientId);
+    // Every database request carries it; none the database key.
+    expect(harness.cosmos.authorizations, isNotEmpty);
+    expect(harness.cosmos.authorizations.toSet(), {
+      Uri.encodeComponent('type=aad&ver=1.0&sig=$databaseToken'),
+    });
+    // The file is left as step 1 wrote it.
+    expect(school.readAsStringSync(), written);
+    expect(school.lastModifiedSync(), writtenAt);
+
+    await harness.dispose(tester);
+  });
+
+  // #308, step 3 ----------------------------------------------------------
+
+  testWidgets('the release without school data on a pc that skipped the '
+      'transitional release: the choice says the teacher gives the school '
+      'file; with it the student is signed in as before', (tester) async {
+    final appData = tempDir('ai_tutor_appdata_');
+    final school = File('${appData.path}/school.json');
+    final databaseScope =
+        '${CosmosTokenSource.scopeFor(exampleSchool.databaseEndpoint)} '
+        'offline_access';
+    bool forDatabase(http.Request r) => r.bodyFields['scope'] == databaseScope;
+    final tokenRequests = <http.Request>[];
+    final entra = MockClient((request) async {
+      tokenRequests.add(request);
+      final database = forDatabase(request);
+      return http.Response(
+        jsonEncode({
+          'access_token': database ? 'database-token' : 'sign-in-access',
+          'refresh_token': 'stored-refresh',
+          if (!database)
+            'id_token': _jwt({
+              'oid': studentIdentity.oid,
+              'name': studentIdentity.displayName,
+              'email': studentIdentity.email,
+            }),
+          'expires_in': 3600,
+        }),
+        200,
+      );
+    });
+    // Signed in, as every install of the school is, but without the school
+    // file step 1 would have written: a build without school data cannot
+    // tell which school this is.
+    final harness = AppHarness(
+      decideMode: true,
+      schoolData: appData,
+      schoolFilePicker: () async => exampleSchoolFile(),
+      entra: entra,
+      prefs: {
+        'azure_auth_tokens_v1': jsonEncode({
+          'access_token': 'old-access',
+          'refresh_token': 'stored-refresh',
+          'id_token': null,
+          'access_token_expiry': null,
+        }),
+      },
+    );
+    await harness.boot(tester, waitForShell: false);
+
+    // The choice, with no school picked for the student, and the line that
+    // says where the school file comes from.
+    await pumpUntilFound(tester, find.byType(FirstStartPage));
+    expect(
+      find.text(
+        'Using the app at school? Then your teacher gives you a school file.',
+      ),
+      findsOneWidget,
+    );
+    expect(find.byKey(const ValueKey('first-start-school')), findsOneWidget);
+    expect(find.byType(SignInPage), findsNothing);
+    expect(find.byType(AppShell), findsNothing);
+    expect(harness.startedMode, isNull);
+    expect(school.existsSync(), isFalse);
+    expect(tokenRequests, isEmpty);
+
+    // With the file the teacher gave: the stored sign-in still holds, so the
+    // student is back in the app without signing in again.
+    await tester.tap(find.byKey(const ValueKey('first-start-school')));
+    await pumpUntilFound(tester, find.byType(AppShell));
+    expect(find.byType(SignInPage), findsNothing);
+    expect(find.byTooltip('Sign out'), findsOneWidget);
+    expect(harness.startedMode, SchoolMode(exampleSchool));
+    expect(school.existsSync(), isTrue);
+    expect(tokenRequests.first.bodyFields['refresh_token'], 'stored-refresh');
+    expect(tokenRequests.first.url.path, contains(exampleSchool.tenantId));
+    // A build without school data: the database with the sign-in.
+    expect(harness.cosmos.authorizations, isNotEmpty);
+    expect(harness.cosmos.authorizations.toSet(), {
+      Uri.encodeComponent('type=aad&ver=1.0&sig=database-token'),
+    });
+    expect(tester.takeException(), isNull);
+
     await harness.dispose(tester);
   });
 

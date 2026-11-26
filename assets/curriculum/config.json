@@ -1,0 +1,11 @@
+{
+  "container": "config",
+  "docs": [
+    {
+      "Model": "gpt-5.4",
+      "id": "global",
+      "type": "config"
+    }
+  ],
+  "partitionKeyField": "type"
+}

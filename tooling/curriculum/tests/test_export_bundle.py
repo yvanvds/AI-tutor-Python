@@ -60,7 +60,7 @@ class AllowList(unittest.TestCase):
         self.assertLessEqual(set(self.db.touched), set(eb.ALLOWED))
         self.assertFalse(set(self.bundle) & eb.STUDENT_CONTAINERS)
         for name in ("accounts", "lo_beliefs", "turn_history", "turn_content", "progress",
-                     "playground_files", "grade_proposals", "reports"):
+                     "playground_files", "grade_proposals", "reports", "podium"):
             self.assertIn(name, eb.STUDENT_CONTAINERS)
             self.assertNotIn(name, eb.ALLOWED)
 
@@ -179,6 +179,33 @@ class Manifest(unittest.TestCase):
             fresh = {p.name: p.read_text(encoding="utf-8") for p in Path(tmp).iterdir()}
         on_disk = {p.name: p.read_text(encoding="utf-8") for p in FIXTURE_DIR.iterdir()}
         self.assertEqual(on_disk, fresh)
+
+
+class ShippedBundle(unittest.TestCase):
+    """The bundle in `assets/curriculum/` (#265): what an export wrote, and
+    still only what the guards let through."""
+
+    def setUp(self):
+        self.manifest = eb.read_manifest(eb.BUNDLE_DIR)
+        if self.manifest is None:
+            self.skipTest("no bundle exported")
+        self.bundle = eb.read_bundle(eb.BUNDLE_DIR)
+
+    def test_passes_the_guards(self):
+        self.assertEqual(set(self.bundle), set(eb.ALLOWED))
+        for container, docs in self.bundle.items():
+            for doc in docs:
+                # `clean` keeps only the list and stops at anything key-like.
+                self.assertEqual(eb.clean(container, doc), doc, f"{container}/{doc.get('id')}")
+        self.assertEqual([d["id"] for d in self.bundle["config"]], ["global"])
+        for q in self.bundle["questions"]:
+            self.assertEqual(q["status"], "active", q["id"])
+
+    def test_manifest_matches_the_content(self):
+        self.assertEqual(self.manifest["format"], eb.FORMAT)
+        self.assertEqual(self.manifest["contentVersion"], eb.content_version(self.bundle))
+        for c, entry in self.manifest["containers"].items():
+            self.assertEqual(entry["count"], len(self.bundle[c]), c)
 
 
 class Diff(unittest.TestCase):

@@ -7,9 +7,10 @@
 //
 // Auth is pluggable via [CosmosAuth]. [CosmosClient.instance] uses a
 // [MasterKeyAuth] on the school configuration of the app mode (#262), or,
-// when the school asks for [DatabaseAccess.signIn], the user's own sign-in
-// ([AadTokenAuth], #306) — without touching call sites. In stand-alone mode the same interface sits on local files instead
-// (`LocalCosmosClient`, #263).
+// when the school asks for [DatabaseAccess.signIn] or the build has no
+// school data (#336), the user's own sign-in ([AadTokenAuth], #306) —
+// without touching call sites. In stand-alone mode the same interface sits
+// on local files instead (`LocalCosmosClient`, #263).
 
 import 'dart:async';
 import 'dart:convert';
@@ -229,11 +230,9 @@ class CosmosClient {
 
   /// The client for [mode]'s data.
   ///
-  /// School mode: the school's database. With [DatabaseAccess.masterKey]
-  /// through [databaseKey], the build's key unless a test passes its own.
-  /// With [DatabaseAccess.signIn] (#306) through the user's own sign-in
-  /// ([tokenSource], by default the one `AuthService` keeps); [databaseKey]
-  /// is then never asked for, so a build without a key works.
+  /// School mode: the school's database, reached as [schoolAuth] decides
+  /// from the school and the build ([databaseKey], [schoolDataInBuild] and
+  /// [tokenSource] go there).
   ///
   /// Stand-alone mode: the local storage under [localDataRoot] (#263), read
   /// from disk here. Finding that folder is async, so `main` opens it
@@ -243,6 +242,7 @@ class CosmosClient {
   static CosmosClient forMode(
     AppMode mode, {
     String Function() databaseKey = buildSchoolDatabaseKey,
+    bool Function() schoolDataInBuild = buildHasSchoolData,
     Directory? localDataRoot,
     CosmosTokenSource? tokenSource,
   }) {
@@ -256,18 +256,41 @@ class CosmosClient {
       }
       return LocalCosmosClient.open(localDataRoot);
     }
-    final CosmosAuth auth = switch (school.databaseAccess) {
-      DatabaseAccess.masterKey => MasterKeyAuth(databaseKey()),
-      DatabaseAccess.signIn => AadTokenAuth(
-        (tokenSource ?? CosmosTokenSource.forMode(mode as SchoolMode)).token,
-      ),
-    };
     return CosmosClient._(
       endpoint: school.databaseEndpoint,
       databaseId: school.databaseName,
-      auth: auth,
+      auth: schoolAuth(
+        mode as SchoolMode,
+        databaseKey: databaseKey,
+        schoolDataInBuild: schoolDataInBuild,
+        tokenSource: tokenSource,
+      ),
     );
   }
+
+  /// How the app reaches [mode]'s school database: as
+  /// [SchoolConfig.databaseAccessIn] a build with or without school data
+  /// ([schoolDataInBuild], this build's own unless a test passes its own)
+  /// says (#336).
+  ///
+  /// [DatabaseAccess.masterKey]: through [databaseKey], the build's key
+  /// unless a test passes its own. [DatabaseAccess.signIn] (#306): through
+  /// the user's own sign-in ([tokenSource], by default the one `AuthService`
+  /// keeps); [databaseKey] is then never asked for, so a build without a key
+  /// works.
+  static CosmosAuth schoolAuth(
+    SchoolMode mode, {
+    String Function() databaseKey = buildSchoolDatabaseKey,
+    bool Function() schoolDataInBuild = buildHasSchoolData,
+    CosmosTokenSource? tokenSource,
+  }) => switch (mode.school.databaseAccessIn(
+    buildHasSchoolData: schoolDataInBuild(),
+  )) {
+    DatabaseAccess.masterKey => MasterKeyAuth(databaseKey()),
+    DatabaseAccess.signIn => AadTokenAuth(
+      (tokenSource ?? CosmosTokenSource.forMode(mode)).token,
+    ),
+  };
 
   static void overrideInstance(CosmosClient client) => _instance = client;
 

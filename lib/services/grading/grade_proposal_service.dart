@@ -456,7 +456,7 @@ final gradeJustificationConnectorProvider = Provider<OpenaiConnector>(
   (ref) => OpenaiConnector(
     getConfig: () => ref.read(globalConfigServiceProvider),
     getModelOverride: () => ref.read(modelPreferenceProvider),
-    getApiKey: () => ref.read(tutorApiKeyProvider),
+    getApiKey: () => ref.read(resolveTutorApiKeyProvider)(),
     client: ref.watch(openaiClientProvider),
   ),
 );

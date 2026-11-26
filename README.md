@@ -14,31 +14,35 @@ The tutor follows a teacher-defined goal tree, picks the type of exercise (multi
 
 ---
 
-> **For now the app only works for students of SMA Arcadia.** They sign in with their Arcadia Microsoft account, and the teacher switches the account on. A version you can use outside the school is being worked on: follow [#261](https://github.com/yvanvds/AI-tutor-Python/issues/261).
+> **The app works with a school file from the teacher, or without a school.** The installer of the [latest release](https://github.com/yvanvds/AI-tutor-Python/releases/latest) has no school built in. With the school file, students sign in with their school's Microsoft account and work in their school's database. Without one, the app runs stand-alone ([#261](https://github.com/yvanvds/AI-tutor-Python/issues/261)): a local profile, everything stays on the pc, and the user enters an OpenAI key of their own.
 
-## ⚠️ This build cannot be used as-is
+## Using the app in your own school
 
-The published binaries are hard-wired to **our school's Microsoft 365 (Entra ID) tenant** — only accounts in that tenant can sign in, and they are the only accounts the configured Azure Cosmos DB will accept. If you download a release from this repository and run it, you will get stuck on the sign-in screen.
+A school does not need a build of its own. It sets up its own environment once, and hands out a school file:
 
-To use this project in your own classroom you have to **build your own copy** with your own credentials. The good news: you do not need to touch any of the Dart code. You only need to:
+1. An OpenAI API key ([Step 1](#step-1--create-an-openai-api-key)). It goes in the school's own database, not in the school file.
+2. An app registration in the school's own Microsoft Entra tenant ([Step 2](#step-2--create-the-microsoft-entra-app-registration)), for the sign-in.
+3. A Cosmos DB account with its containers ([Step 3](#step-3--create-the-azure-cosmos-db)) and its content: the goals, the lessons and the tutor's instructions ([Step 6](#step-6--first-run-and-bootstrapping-content)).
+4. The admin consent and the roles of [Access with the user's own sign-in](#access-with-the-users-own-sign-in-for-an-administrator), so that the database accepts each user's own sign-in.
+5. A [school file](#the-school-file) for the students: a small JSON file with no keys or passwords in it.
 
-1. Create three things in the cloud (one Entra app registration, one Cosmos DB account, one OpenAI API key).
-2. Paste six values into a `.env` file.
-3. Run two commands to produce a Windows installer.
+The teacher's tooling (writing the goals and lessons to the database, the sign-in check) runs from a copy of this repository and reads its values from a `.env` ([Step 4](#step-4--get-the-source-code-and-configure-env)). Building the app yourself ([Step 5](#step-5--build-the-installer)) is only for working on the app itself, or for releases of your own ([Step 7](#step-7-optional--updates)).
 
-The rest of this README walks through that. No prior Flutter/Dart experience is required, but you should be comfortable opening the Azure portal, copying GUIDs, and running PowerShell commands.
+You do not need to touch any of the Dart code, and no prior Flutter/Dart experience is required, but you should be comfortable opening the Azure portal, copying GUIDs, and running PowerShell commands.
+
+Without a school, nothing has to be set up: install the app and pick *Continue without a school* at the first start.
 
 ---
 
 ## What you will end up with
 
-A `python_teacher_install.exe` (Inno Setup installer, ~150 MB) that you can hand to students. After install they sign in once with their school Microsoft account and the app remembers them. There is also a built-in updater: publish a GitHub release with the installer attached and every running copy will offer to update itself.
+Students install the app from the latest release, pick the school file at the first start and sign in once with their school Microsoft account; the app remembers them. The app updates itself: every running copy offers each new release (Step 7). A build of your own gives you a `python_teacher_install.exe` of your own (Inno Setup installer, ~80 MB).
 
 ---
 
 ## Prerequisites on your machine
 
-You need these tools installed once. All free.
+For the school setup alone, Git, Python 3 (for the teacher's tooling) and the Azure CLI (for the roles) are enough. For a build of your own you need these tools installed once. All free.
 
 1. **Flutter SDK 3.47.1** — <https://docs.flutter.dev/get-started/install/windows>. After installing run `flutter doctor` and fix any red items, especially the Visual Studio "Desktop development with C++" workload (required for Windows builds). This is the exact version CI installs (`FLUTTER_VERSION` in [.github/workflows/build.yml](.github/workflows/build.yml)). An older SDK now fails `flutter pub get` outright, because `pubspec.yaml` requires `sdk: ^3.13.1` (the Dart version bundled with Flutter 3.47.1). Building works on newer ones, but `dart format` output differs between Dart versions, so only this one is guaranteed to agree with CI's format gate.
 2. **Git** — <https://git-scm.com/download/win>.
@@ -51,7 +55,7 @@ You need these tools installed once. All free.
 
 1. Go to <https://platform.openai.com/api-keys>.
 2. Sign in (or create an OpenAI account) and click **Create new secret key**.
-3. Copy the key (`sk-...`). You will paste it as `OPEN_AI_API_KEY` later.
+3. Copy the key (`sk-...`). It goes in your database, as `ApiKey` in `config/global` ([Step 6](#step-6--first-run-and-bootstrapping-content)).
 4. Make sure the OpenAI account has billing set up and a usage limit you are comfortable with — every student message costs a few tenths of a cent.
 
 The default model is `gpt-4o`, configurable later from inside the app (Teacher → settings).
@@ -114,6 +118,7 @@ This stores accounts, goals, progress, instructions, and status reports.
    | `questions`      | `/subgoalId`  |
    | `translations`   | `/language`   |
    | `turn_content`   | `/uid`        |
+   | `podium`         | `/type`       |
 
    The list the app actually uses is `lib/core/cosmos_paths.dart` — every
    container it can open is declared there, with its partition key in the doc
@@ -148,6 +153,19 @@ This stores accounts, goals, progress, instructions, and status reports.
    the school year, but only in a container with TTL on — without it the
    docs are kept forever. From the Azure CLI:
    `az cosmosdb sql container create --account-name <account> --resource-group <group> --database-name python-tutor --name turn_content --partition-key-path /uid --partition-key-version 2 --ttl -1`
+
+   `podium` (the class podium, #221) is a container of its own since #338;
+   before, it was the partition `podium` of `config`. Students write their
+   places there, so with access through their own sign-in (#306) they need
+   read and write on `podium` but only read on `config`. Until it exists,
+   nobody gets a place on the podium; `tooling/badges/podium_backfill.py`
+   can fill in those places afterwards. Create it before you release the
+   version that moves the podium, then copy the places that are still in
+   `config` with `python tooling/badges/podium_copy.py` (a dry run; add
+   `--apply` to write). Run the copy again once `MinimumVersion` keeps the
+   older builds out, for places they wrote in `config` in the meantime. The
+   old docs stay in `config` until you remove them. From the Azure CLI:
+   `az cosmosdb sql container create --account-name <account> --resource-group <group> --database-name python-tutor --name podium --partition-key-path /type --partition-key-version 2`
 
    An existing deployment may still have a `period_start_snapshots`
    container: nothing writes or reads it since formula v1.0.16 (#191), and
@@ -184,6 +202,7 @@ A few things to know:
 - The file is **gitignored** — it will not get committed. Do not paste it into a chat or screenshot.
 - The values are read at build time by the `envied` package. Keep the file private: it holds your own keys.
 - `ENTRA_REDIRECT_URI` must be exactly `http://localhost` to match step 2.4.
+- `OPEN_AI_API_KEY` is only a fallback. The school's key comes from `ApiKey` in `config/global` ([Step 6](#step-6--first-run-and-bootstrapping-content)); the app uses this value only while that field is empty. With `dummy` here there is no fallback, and `ApiKey` is the only key.
 - There is a seventh, **optional** line — `GITHUB_OAUTH_CLIENT_ID` — for in-app bug reports. Leave it out and everything else works; the Options panel simply says it cannot sign in to GitHub. [Step 8](#step-8-optional--in-app-bug-reports-github-oauth-app) sets it up.
 
 ---
@@ -230,15 +249,22 @@ The installer ends up in `dist/<version>/python_teacher_install.exe`. That is th
 
 When you start the app for the first time:
 
-1. Sign in with your own (Teacher-role) Microsoft account. The app creates an `accounts/{your-uid}` document automatically.
+1. Sign in with your own (Teacher-role) Microsoft account. The app creates an `accounts/{your-uid}` document automatically. A release first asks how you use the app: pick *I have a file from my school* and the school file ([The school file](#the-school-file)). It then reaches the database with your sign-in: set up the roles and the consent of [Access with the user's own sign-in](#access-with-the-users-own-sign-in-for-an-administrator) before this step.
 2. Because you have the `Teacher` role, you will see the teacher pages in the sidebar: **Goals**, **Lesson content**, **Questions**, **Instructions**, **Students**, …
 3. **Instructions.** The prompts that shape the tutor are in [instructions-export.md](instructions-export.md). Go to **Instructions** and use **Import from Markdown** to load it. Each document's id is the name of a request type in `ChatRequestType` ([lib/core/chat_request_type.dart](lib/core/chat_request_type.dart)), plus `alwaysInclude`, which goes along with every call; the file is the full list. It can lag behind what runs live, so if you have access to a working deployment, export a fresh copy there first (**Export all to Markdown**).
 
    Placeholders filled in at runtime: `{goal}`, `{subgoal}`, `{teachingTips}`, `{targetLOs}` and `{goalScopeLOs}`. The old name `{suggestions}` still works as `{teachingTips}`; `{known concepts}` is replaced by nothing.
 4. **Goals and lessons.** You do not build the goal tree by hand. The goal files and their lessons are in `Goal Generator Cowork Project/AI Tutor for Python Goals Generator/` (`goals/` and `lessons/`). [tooling/curriculum/push_goal.py](tooling/curriculum/push_goal.py) writes a goal and its Dutch lessons to the database (`plan` first for a dry run, then `push`), and [tooling/translations/translations.py](tooling/translations/translations.py) `push` writes the English texts. Both need Python 3 and read the Cosmos values from your `.env`.
-5. Optional: edit `config/global` from the Cosmos Data Explorer if you want to switch to a different OpenAI model (e.g. `gpt-4o-mini` for cheaper runs). The field is `Model`. `MinimumVersion` (#165) is optional: set it (for example `2.6.0`) to keep every older build out — such a build shows an update screen instead of the app until it is updated, so a device that keeps declining the update cannot go on writing documents in an outdated shape. Leave it out, or blank, to allow every build. `QuestionBankMinimum` and `QuestionBankShare` (#186) are optional too: once the question bank holds at least `QuestionBankMinimum` questions that fit what the tutor is about to ask (default 8) and that the student has not had, the question comes from the bank instead of being generated with a chance of `QuestionBankShare` (0 to 1, default 0.5; 0 switches serving from the bank off). See `docs/CONDUCTOR_POLICY.md` §2.7. `TurnContentKeepUntil` (#228) is optional as well: the day, `MM-DD`, until which the question, answer and feedback of each oefening are kept in `turn_content` (midnight Belgian time; default `07-01`, the end of the school year). See `docs/CONDUCTOR_POLICY.md` §8.4.
+5. **The OpenAI key.** In the Cosmos Data Explorer, open the document `global` in the `config` container (partition key `config`), or create it, and set `ApiKey` to the key from Step 1:
 
-Once that is done, hand the installer to a student. They sign in with their school account, the app creates their profile automatically, and the tutor starts at the first incomplete subgoal.
+   ```json
+   { "id": "global", "type": "config", "Model": "gpt-4o", "ApiKey": "sk-..." }
+   ```
+
+   Every account with the school's key (the **KEY** switch on the **Students** page) calls OpenAI with it; the other accounts use a key of their own, entered in the app. A new key reaches every open app within a few seconds, without a new build. While `ApiKey` is empty, the app falls back on `OPEN_AI_API_KEY` from `.env` (Step 4), though not in a release ([Step 7](#how-a-release-is-built)); without that, the tutor sends nothing and tells the student that the school has not set a key yet. Changing the model in the app leaves `ApiKey` as it is. From a script, `tooling/evaluation/cosmos.py` can read the document and write it back with `ApiKey` filled in (partition key `config`).
+6. Optional: edit `config/global` from the Cosmos Data Explorer if you want to switch to a different OpenAI model (e.g. `gpt-4o-mini` for cheaper runs). The field is `Model`. `MinimumVersion` (#165) is optional: set it (for example `2.6.0`) to keep every older build out — such a build shows an update screen instead of the app until it is updated, so a device that keeps declining the update cannot go on writing documents in an outdated shape. Leave it out, or blank, to allow every build. `QuestionBankMinimum` and `QuestionBankShare` (#186) are optional too: once the question bank holds at least `QuestionBankMinimum` questions that fit what the tutor is about to ask (default 8) and that the student has not had, the question comes from the bank instead of being generated with a chance of `QuestionBankShare` (0 to 1, default 0.5; 0 switches serving from the bank off). See `docs/CONDUCTOR_POLICY.md` §2.7. `TurnContentKeepUntil` (#228) is optional as well: the day, `MM-DD`, until which the question, answer and feedback of each oefening are kept in `turn_content` (midnight Belgian time; default `07-01`, the end of the school year). See `docs/CONDUCTOR_POLICY.md` §8.4.
+
+Once that is done, hand out the school file (and your own installer, if you built one). A student installs the app, picks the school file and signs in with their school account; the app creates their profile automatically, and the tutor starts at the first incomplete subgoal.
 
 ---
 
@@ -261,6 +287,24 @@ pre-release tag is never pushed at a student.
 To point the app at your own fork, change `kReleaseOwner` / `kReleaseRepo` in
 [lib/core/github_release.dart](lib/core/github_release.dart). If you do not
 need auto-updates, you can ignore this entirely; the app still works.
+
+### How a release is built
+
+A release has no school data ([#308](https://github.com/yvanvds/AI-tutor-Python/issues/308)): the school's settings come from the school file ([The school file](#the-school-file)) and from `config/global`, and the app reaches the school's database with the user's own sign-in. Your `.env` stays as it is, for development. For the build, `tooling/build_release.ps1` puts a release `.env` in its place, with the school's values replaced by the placeholders CI uses (`GITHUB_OAUTH_CLIENT_ID` is no school data and stays). It regenerates the envied files from it and checks with `test/tooling/release_without_school_data_test.dart` that the build has no school data; a failed check stops the release before the version is bumped. Afterwards, also when something fails, your `.env` and the generated files are put back as they were.
+
+Before the first release without school data:
+
+- Fill in `ApiKey` in `config/global` ([Step 6](#step-6--first-run-and-bootstrapping-content)). A release has no fallback for it: while `ApiKey` is empty, the tutor sends nothing and tells the students that the school has not set a key yet.
+- Set up and check the roles and the admin consent of [Access with the user's own sign-in](#access-with-the-users-own-sign-in-for-an-administrator). Without them the database refuses every request of the app.
+
+```powershell
+pwsh tooling/build_release.ps1                  # bump, build, commit, tag, push and publish
+pwsh tooling/build_release.ps1 -CheckOnly       # only the release .env and its check: bumps and builds nothing
+pwsh tooling/build_release.ps1 -SkipPublish     # build the installer, publish nothing
+pwsh tooling/build_release.ps1 -WithSchoolData  # emergency release, built as before #308
+```
+
+`-WithSchoolData` builds with your `.env` and its generated files as they are, without the release `.env` and without the check, the way every release before #308 was built. Keep it for an emergency. When an envied class reads a new `.env` key, the script stops until the key is listed at its top, as school data (`SchoolEnvValues`) or as a key to keep (`KeptEnvKeys`).
 
 ---
 
@@ -383,7 +427,7 @@ A school file lets students point the app at their school without a build of its
 }
 ```
 
-`databaseName` is optional (default `python-tutor`). So is `databaseAccess`, how the app reaches the database: `"masterKey"` (the default) with the database key of the build, or `"signIn"` with the user's own sign-in ([#306](https://github.com/yvanvds/AI-tutor-Python/issues/306)). `"signIn"` is not in use yet: it needs roles on the database and admin consent in the tenant first (see the issue). The app refuses a file that has a field named like a key, token or password, and a file with a newer `formatVersion` than it knows; it then says why and changes nothing.
+`databaseName` is optional (default `python-tutor`). So is `databaseAccess`, how the app reaches the database: `"masterKey"` (the default) with the database key of the build, or `"signIn"` with the user's own sign-in ([#306](https://github.com/yvanvds/AI-tutor-Python/issues/306)). A build without school data uses the sign-in for every school file, with or without this field ([#336](https://github.com/yvanvds/AI-tutor-Python/issues/336)), so the school file of an existing install keeps working as it is. The sign-in needs roles on the database and admin consent in the tenant first: see [Access with the user's own sign-in](#access-with-the-users-own-sign-in-for-an-administrator). The app refuses a file that has a field named like a key, token or password, and a file with a newer `formatVersion` than it knows; it then says why and changes nothing.
 
 How the app uses it:
 
@@ -393,7 +437,128 @@ How the app uses it:
 
 A build that has a school configuration in its `.env` (Step 4) starts in that school as before, without asking.
 
-Today only SMA Arcadia's setup exists. The school file only spreads the configuration: a school that wants the school mode still needs Steps 2 and 3 (its own app registration and database, with its content), and until access through the user's own sign-in is switched on ([#306](https://github.com/yvanvds/AI-tutor-Python/issues/306)) a build made with that school's `.env` as well.
+The school's OpenAI key is not in the school file either: it is `ApiKey` in the school's own `config/global` (Step 6), so every school pays for its own use.
+
+The school file only spreads the configuration: a school that wants the school mode still needs Steps 2 and 3 (its own app registration and database, with its content) and the roles and the consent of the next section. It needs no build of its own: a release has no school data ([How a release is built](#how-a-release-is-built)) and reaches the database with the user's own sign-in, so the school file is all its students need.
+
+---
+
+## Access with the user's own sign-in (for an administrator)
+
+With `"databaseAccess": "signIn"` in the school file, or in any build without school data ([The school file](#the-school-file)), the app reaches the database with the user's own sign-in instead of the database key ([#306](https://github.com/yvanvds/AI-tutor-Python/issues/306)). Cosmos DB then decides itself what each user may do, from roles you assign. Without those roles and the consent below, the database refuses every request of the app (403), so set them up before you switch the sign-in on. Both need administrator rights and happen outside the app, once per school.
+
+You need:
+
+- **Two security groups** in Entra ID: one with the students, one with the teachers. Which groups (new ones, or groups the school already has) is the school's choice. Copy each group's **Object ID** (**Microsoft Entra ID** → **Groups** → the group → **Overview**). Give the teachers' group the same people as the `Teacher` app role of [Step 2](#step-2--create-the-microsoft-entra-app-registration): the app role decides which pages the app shows, the group what the database allows.
+- **The Azure CLI** (`az`), signed in with `az login` as someone who may manage the Cosmos DB account (for example *Owner* or *DocumentDB Account Contributor* on it).
+
+### Admin consent
+
+The app asks Entra for a token for the database, with the delegated permission `user_impersonation` of Azure Cosmos DB. Grant it once for the whole organisation, so that no student ever sees a consent screen:
+
+1. In the Azure portal, go to **Microsoft Entra ID** → **App registrations** → the app of Step 2 → **API permissions**.
+2. **Add a permission** → **APIs my organization uses** → search for **Azure Cosmos DB** → **Delegated permissions** → tick **`user_impersonation`** → **Add permissions**.
+3. Click **Grant admin consent for &lt;your tenant&gt;** and confirm. The *Status* column now says *Granted*.
+
+### Roles per container
+
+Cosmos DB has two built-in data roles, and they are all this needs:
+
+| Role | Role definition id |
+|------|--------------------|
+| Cosmos DB Built-in Data Reader | `00000000-0000-0000-0000-000000000001` |
+| Cosmos DB Built-in Data Contributor | `00000000-0000-0000-0000-000000000002` |
+
+A role reaches a whole container, or the whole database, never a partition or a single document.
+
+Teachers get Data Contributor on the whole database. Students get, per container, what the app does there in a student's session: **read and write** is Data Contributor, **read** is Data Reader, **none** is no role.
+
+| Container | Students | What a student's session does there |
+|-----------|----------|-------------------------------------|
+| `accounts` | read and write | creates the profile at the first sign-in; streak, XP and badges after each oefening |
+| `progress` | read and write | the progress per goal after each oefening; a reset or an import in Options |
+| `progress_history` | read and write | a progress sample after each oefening |
+| `status_reports` | read and write | the report per subgoal |
+| `lo_beliefs` | read and write | what the student masters, after each oefening |
+| `turn_history` | read and write | a record per graded answer |
+| `turn_content` | read and write | the question, the answer and the feedback of each oefening |
+| `playground_files` | read and write | the files of the Playground |
+| `questions` | read and write | stores a new question and counts each answer; shared by all students |
+| `podium` | read and write | claims a place on the class podium; shared by all students |
+| `goals` | read | the goal tree |
+| `instructions` | read | the tutor's prompts |
+| `config` | read | `global` (the school's settings) and `classes` (the timetable) |
+| `content` | read | the lessons |
+| `translations` | read | the lessons and goal texts in another language |
+| `milestones` | read | the report dates |
+| `reports` | read | the student's own published reports |
+| `modules` | none | not opened in a student's session |
+| `grade_proposals` | none | not opened in a student's session |
+
+The writes in the containers students only read are the teacher's: the Goals, Lesson content, Instructions, Classes, Milestones and Reports pages, and the school's model in Options. The list is worked out from the code: `kStudentAccess` in [lib/core/cosmos_paths.dart](lib/core/cosmos_paths.dart) says, per container, where the writes come from, and `test/core/cosmos_student_access_test.dart` checks that this table and the commands below say the same, for every container.
+
+The assignments, from PowerShell. Fill in the first five lines; `$db` is the `databaseName` of the school file:
+
+```powershell
+$account     = "<cosmos-account-name>"
+$group       = "<resource-group>"
+$db          = "python-tutor"
+$students    = "<object id of the students' group>"
+$teachers    = "<object id of the teachers' group>"
+$reader      = "00000000-0000-0000-0000-000000000001"  # Cosmos DB Built-in Data Reader
+$contributor = "00000000-0000-0000-0000-000000000002"  # Cosmos DB Built-in Data Contributor
+
+# Teachers: read and write on the whole database
+az cosmosdb sql role assignment create --account-name $account --resource-group $group --scope "/dbs/$db" --principal-id $teachers --role-definition-id $contributor
+
+# Students: read and write
+az cosmosdb sql role assignment create --account-name $account --resource-group $group --scope "/dbs/$db/colls/accounts" --principal-id $students --role-definition-id $contributor
+az cosmosdb sql role assignment create --account-name $account --resource-group $group --scope "/dbs/$db/colls/progress" --principal-id $students --role-definition-id $contributor
+az cosmosdb sql role assignment create --account-name $account --resource-group $group --scope "/dbs/$db/colls/progress_history" --principal-id $students --role-definition-id $contributor
+az cosmosdb sql role assignment create --account-name $account --resource-group $group --scope "/dbs/$db/colls/status_reports" --principal-id $students --role-definition-id $contributor
+az cosmosdb sql role assignment create --account-name $account --resource-group $group --scope "/dbs/$db/colls/lo_beliefs" --principal-id $students --role-definition-id $contributor
+az cosmosdb sql role assignment create --account-name $account --resource-group $group --scope "/dbs/$db/colls/turn_history" --principal-id $students --role-definition-id $contributor
+az cosmosdb sql role assignment create --account-name $account --resource-group $group --scope "/dbs/$db/colls/turn_content" --principal-id $students --role-definition-id $contributor
+az cosmosdb sql role assignment create --account-name $account --resource-group $group --scope "/dbs/$db/colls/playground_files" --principal-id $students --role-definition-id $contributor
+az cosmosdb sql role assignment create --account-name $account --resource-group $group --scope "/dbs/$db/colls/questions" --principal-id $students --role-definition-id $contributor
+az cosmosdb sql role assignment create --account-name $account --resource-group $group --scope "/dbs/$db/colls/podium" --principal-id $students --role-definition-id $contributor
+
+# Students: read
+az cosmosdb sql role assignment create --account-name $account --resource-group $group --scope "/dbs/$db/colls/goals" --principal-id $students --role-definition-id $reader
+az cosmosdb sql role assignment create --account-name $account --resource-group $group --scope "/dbs/$db/colls/instructions" --principal-id $students --role-definition-id $reader
+az cosmosdb sql role assignment create --account-name $account --resource-group $group --scope "/dbs/$db/colls/config" --principal-id $students --role-definition-id $reader
+az cosmosdb sql role assignment create --account-name $account --resource-group $group --scope "/dbs/$db/colls/content" --principal-id $students --role-definition-id $reader
+az cosmosdb sql role assignment create --account-name $account --resource-group $group --scope "/dbs/$db/colls/translations" --principal-id $students --role-definition-id $reader
+az cosmosdb sql role assignment create --account-name $account --resource-group $group --scope "/dbs/$db/colls/milestones" --principal-id $students --role-definition-id $reader
+az cosmosdb sql role assignment create --account-name $account --resource-group $group --scope "/dbs/$db/colls/reports" --principal-id $students --role-definition-id $reader
+
+# What is assigned now
+az cosmosdb sql role assignment list --account-name $account --resource-group $group --output table
+```
+
+Good to know:
+
+- **It takes a few minutes.** A new role assignment, or a change to who is in a group, can take a few minutes to reach the database. Until then those requests still get a 403: wait before you change anything else.
+- **Containers stay with the teacher.** A token from a sign-in cannot create or delete containers; the roles above only cover the documents in them. Create a container as in [Step 3](#step-3--create-the-azure-cosmos-db), with the portal or `az cosmosdb sql container create`. A version that adds a container adds a row to the table above: create the container and give it its role before you release that version.
+- **The class podium.** Builds from before #338 write the podium in `config`, which students may only read, so that write is refused. Keep those builds out with `MinimumVersion` (Step 6) before you switch the sign-in on.
+- **The teacher's tooling** (`tooling/`) keeps reaching the database with the key from `.env`; the roles do not change it.
+
+### Check it before you switch
+
+[tooling/school/check_signin_access.py](tooling/school/check_signin_access.py) tries every kind of request the app makes, with a token from your own sign-in, on a test container of its own. It refuses a container the app uses. Run it as a teacher once the consent and the roles are in place:
+
+```powershell
+# A test container (partition key /pk, or any other but /id)
+az cosmosdb sql container create --account-name $account --resource-group $group --database-name $db --name signin_check --partition-key-path /pk --partition-key-version 2
+
+# Sign in (a browser opens) and try create, read, query, replace with If-Match, a transactional batch and delete
+python tooling/school/check_signin_access.py --container signin_check --database $db
+
+# Remove the test container again
+az cosmosdb sql container delete --account-name $account --resource-group $group --database-name $db --name signin_check
+```
+
+It reads the tenant, the app's client id and the database endpoint from `.env` (`ENTRA_TENANT_ID`, `ENTRA_CLIENT_ID`, `COSMOS_ENDPOINT`) and prints none of them, nor the token: only each step's status code, and for a 403 the permission that is missing. The sign-in is the app's own (a browser, then back to `http://localhost`), so the app registration needs no change. It ends with exit code 0 when every step answered as the app expects. As a teacher it checks the role on the whole database; to check a role on a single container and a group as well, give the students' group Data Contributor on the test container (`--scope "/dbs/$db/colls/signin_check"`) and run it again signed in with an account in that group (the browser asks which account). Then switch the sign-in on in the school file ([The school file](#the-school-file)).
 
 ---
 

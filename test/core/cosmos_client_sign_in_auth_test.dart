@@ -238,6 +238,8 @@ void main() {
           keyAsked = true;
           return base64Encode(List<int>.filled(32, 7));
         },
+        // In a build with school data; without, it is the sign-in (#336).
+        schoolDataInBuild: () => true,
       );
       expect(keyAsked, isTrue);
     });

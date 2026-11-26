@@ -1,12 +1,17 @@
 // Issue #221 — the class podium: who is first (create on place 1, a 409
 // moves on), students finishing at the same time never share a place, a
 // place once held is found again rather than a second taken, a fourth gets
-// nothing, finishing again does not count, and the docs sit in the `podium`
-// partition of `config` with the student's uid and nothing else about them.
+// nothing, finishing again does not count, and the docs sit in the
+// `podium` container with the student's uid and nothing else about them.
+//
+// Issue #338 — the podium has a container of its own instead of a partition
+// of `config`: the app claims and reads its places only there, so students
+// need only read `config`.
 
 import 'package:ai_tutor_python/core/answer_quality.dart';
 import 'package:ai_tutor_python/core/cosmos_client.dart';
 import 'package:ai_tutor_python/core/cosmos_doc_id.dart';
+import 'package:ai_tutor_python/core/cosmos_paths.dart';
 import 'package:ai_tutor_python/core/question_difficulty.dart';
 import 'package:ai_tutor_python/services/badges/class_podium.dart';
 import 'package:ai_tutor_python/services/badges/earned_badges.dart';
@@ -43,7 +48,7 @@ PersistedTurnRecord _turn(
   subgoalAdvanced: advanced,
 );
 
-/// A config container whose creates can be made to fail, or to wait.
+/// A podium container whose creates can be made to fail, or to wait.
 class _Flaky implements CosmosContainer {
   _Flaky(this.inner);
   final CosmosContainer inner;
@@ -155,17 +160,15 @@ void main() {
   });
 
   group('claiming', () {
-    late InMemoryCosmos config;
+    late InMemoryCosmos store;
     late _Flaky container;
     late ClassPodium podium;
 
     setUp(() {
       // Partitioned on `type` as in Cosmos: a podium doc written to another
       // partition than its own `type` fails.
-      config = InMemoryCosmos.partitioned('type', [
-        {'id': 'global', 'type': 'config', 'Model': 'gpt-4o'},
-      ]);
-      container = _Flaky(config.container);
+      store = InMemoryCosmos.partitioned('type');
+      container = _Flaky(store.container);
       podium = ClassPodium(container: container);
     });
 
@@ -178,7 +181,7 @@ void main() {
       expect((await claim('b'))!.place, 2);
       expect((await claim('c'))!.place, 3);
       expect(await claim('d'), isNull);
-      final doc = config['podium/podium_6EWI_s1_1']!;
+      final doc = store['podium/podium_6EWI_s1_1']!;
       expect(doc, {
         'id': 'podium_6EWI_s1_1',
         'type': 'podium',
@@ -188,8 +191,6 @@ void main() {
         'uid': 'a',
         'awardedAt': '2026-10-05T09:00:00.000Z',
       });
-      // The settings next to it are untouched.
-      expect(config['config/global'], isNotNull);
     });
 
     test('another class has a podium of its own', () async {
@@ -208,7 +209,7 @@ void main() {
         expect(places.map((p) => p.uid).toSet(), hasLength(3));
         expect(won.where((p) => p == null), hasLength(2));
         expect(
-          config.docs.keys.where((k) => k.startsWith('podium/')),
+          store.docs.keys.where((k) => k.startsWith('podium/')),
           hasLength(3),
         );
       },
@@ -221,7 +222,7 @@ void main() {
       final again = await claim('b');
       expect(again!.place, 2);
       expect(again.uid, 'b');
-      expect(config['podium/podium_6EWI_s1_3'], isNull);
+      expect(store['podium/podium_6EWI_s1_3'], isNull);
     });
 
     test('no class: no claim, nothing written', () async {
@@ -232,7 +233,7 @@ void main() {
     test('Cosmos not answering: it throws, and nothing is claimed', () async {
       container.down = true;
       await expectLater(claim('a'), throwsA(isA<CosmosException>()));
-      expect(config.docs.keys.where((k) => k.startsWith('podium/')), isEmpty);
+      expect(store.docs.keys.where((k) => k.startsWith('podium/')), isEmpty);
     });
 
     test('a student\'s places: only their own', () async {
@@ -245,6 +246,67 @@ void main() {
         unorderedEquals([('s1', 1), ('s2', 1)]),
       );
       expect(mine.every((p) => p.uid == 'a'), isTrue);
+    });
+  });
+
+  group('its own container (#338)', () {
+    late InMemoryCosmosClient cosmos;
+
+    /// A place an older build claimed in `config`, before #338.
+    final legacy = PodiumPlace(
+      className: '6EWI',
+      subgoalId: 's1',
+      place: 1,
+      uid: 'old-build',
+      awardedAt: at,
+    ).toDoc();
+
+    setUp(() {
+      cosmos = InMemoryCosmosClient({
+        'config': InMemoryCosmos.partitioned('type', [
+          {'id': 'global', 'type': 'config', 'Model': 'gpt-4o'},
+          legacy,
+        ]),
+        'podium': InMemoryCosmos.partitioned('type'),
+      })..install();
+    });
+
+    Map<String, Map<String, dynamic>> configDocs() => {
+      for (final e in cosmos['config'].docs.entries)
+        e.key: Map<String, dynamic>.of(e.value),
+    };
+
+    test('the podium is the `podium` container, in its partition `podium`', () {
+      expect(CosmosPartitions.podium, 'podium');
+      expect(
+        identical(CosmosPaths.podium(), cosmos['podium'].container),
+        isTrue,
+      );
+    });
+
+    test('a claim lands in `podium` and leaves `config` as it is', () async {
+      final before = configDocs();
+      final place = await ClassPodium().claim(
+        uid: 'a',
+        className: '6EWI',
+        subgoalId: 's1',
+        at: at,
+      );
+      // Gold: what an older build left in `config` is not looked at.
+      expect(place!.place, 1);
+      expect(cosmos['podium']['podium/podium_6EWI_s1_1']!['uid'], 'a');
+      expect(configDocs(), before);
+    });
+
+    test('a student\'s places are read from `podium` only', () async {
+      await ClassPodium().claim(
+        uid: 'old-build',
+        className: '6EWI',
+        subgoalId: 's2',
+        at: at,
+      );
+      final mine = await ClassPodium().placesOf('old-build');
+      expect(mine.map((p) => p.subgoalId), ['s2']);
     });
   });
 }

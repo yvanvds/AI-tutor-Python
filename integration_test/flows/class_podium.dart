@@ -7,8 +7,9 @@
 //   - the graded answer that moves the student past a subgoal for the first
 //     time claims the first free place on their class's podium: with gold
 //     already someone else's, `create` on place 1 is refused (409) and place 2
-//     is the student's — a doc in the `podium` partition of `config` with the
-//     student's uid and nothing else about them;
+//     is the student's — a doc in the `podium` container (#338) with the
+//     student's uid and nothing else about them, and nothing in `config`,
+//     which students only read;
 //   - the medal lands on the account doc with the other badges and is
 //     announced like them, but only once the goal-reached celebration is
 //     gone — the notice never lands on top of it;
@@ -159,7 +160,7 @@ void main() {
         'progress': [_printDone()],
         'lo_beliefs': [_almostMastered(now)],
         // Someone else in the class finished "Variables" first.
-        'config': [
+        'podium': [
           {
             'id': 'podium_${_class}_s2_1',
             'type': 'podium',
@@ -202,7 +203,7 @@ void main() {
     // The place is claimed by now, or soon: the notice still waits.
     await pumpUntil(
       tester,
-      () => harness.cosmos['config'].docs['podium_${_class}_s2_2'] != null,
+      () => harness.cosmos['podium'].docs['podium_${_class}_s2_2'] != null,
       timeout: const Duration(seconds: 30),
       reason: 'no podium place was claimed',
     );
@@ -223,7 +224,7 @@ void main() {
     );
 
     // Silver: gold was someone else's, and stays theirs.
-    final silver = harness.cosmos['config'].docs['podium_${_class}_s2_2']!;
+    final silver = harness.cosmos['podium'].docs['podium_${_class}_s2_2']!;
     expect(silver['type'], 'podium');
     expect(silver['uid'], kStudentUid);
     expect(silver['className'], _class);
@@ -231,11 +232,15 @@ void main() {
     expect(silver['place'], 2);
     expect(silver.keys, isNot(contains('firstName')));
     expect(
-      harness.cosmos['config'].docs['podium_${_class}_s2_1']!['uid'],
+      harness.cosmos['podium'].docs['podium_${_class}_s2_1']!['uid'],
       _rival,
     );
-    expect(harness.cosmos['config'].docs['podium_${_class}_s2_3'], isNull);
-    // The settings next to it are untouched.
+    expect(harness.cosmos['podium'].docs['podium_${_class}_s2_3'], isNull);
+    // Nothing of the podium in `config` (#338): students only read it.
+    expect(
+      harness.cosmos['config'].docs.keys.where((k) => k.startsWith('podium')),
+      isEmpty,
+    );
     expect(harness.cosmos['config'].docs['global'], isNotNull);
 
     // The medal sits with the other badges on the account doc.
@@ -360,10 +365,15 @@ void main() {
     while (DateTime.now().isBefore(settle)) {
       await tester.pump(const Duration(milliseconds: 200));
     }
-    expect(
-      harness.cosmos['config'].docs.keys.where((k) => k.startsWith('podium_')),
-      isEmpty,
-    );
+    for (final container in ['podium', 'config']) {
+      expect(
+        harness.cosmos[container].docs.keys.where(
+          (k) => k.startsWith('podium'),
+        ),
+        isEmpty,
+        reason: container,
+      );
+    }
     final badges =
         harness.cosmos['accounts'].docs[kStudentUid]!['badges'] as Map;
     expect(badges.containsKey('podium:s2'), isFalse);

@@ -1,0 +1,2500 @@
+{
+  "container": "goals",
+  "docs": [
+    {
+      "allowChains": true,
+      "contentId": "benaderen",
+      "description": "Je kan voorspellen waar rekenen met kommagetallen kleine afwijkingen geeft, twee kommagetallen vergelijken met een tolerantie in plaats van met ==, een vergelijking herschrijven tot het zoeken van een nulpunt van een functie, op een grafiek zien waar dat nulpunt ongeveer ligt, en nagaan of een waarde een goede benadering van een oplossing is.",
+      "id": "benaderen",
+      "moduleId": "python-basics",
+      "objectives": [
+        {
+          "id": "predict_float_equality",
+          "kind": "predict",
+          "optional": false,
+          "statement": "Je kan voorspellen dat een vergelijking met == tussen kommagetallen onverwacht False kan geven, zoals bij 0.1 + 0.2 == 0.3.",
+          "weight": 1
+        },
+        {
+          "id": "write_close_enough",
+          "kind": "apply",
+          "optional": false,
+          "statement": "Je kan nagaan of twee kommagetallen dicht genoeg bij elkaar liggen met abs(a - b) < tolerantie.",
+          "weight": 1
+        },
+        {
+          "id": "write_equation_as_function",
+          "kind": "apply",
+          "optional": false,
+          "statement": "Je kan een vergelijking herschrijven tot f(x) = 0 en die f schrijven als Python-functie.",
+          "weight": 1
+        },
+        {
+          "id": "predict_good_approximation",
+          "kind": "predict",
+          "optional": false,
+          "statement": "Je kan voor een gegeven x voorspellen of abs(f(x)) < tolerantie waar is, en dus of x als oplossing aanvaard wordt.",
+          "weight": 1
+        },
+        {
+          "id": "write_plot_to_locate_zero",
+          "kind": "apply",
+          "optional": false,
+          "statement": "Je kan de grafiek van een functie met een raster tekenen om te zien tussen welke waarden een nulpunt ligt.",
+          "weight": 1
+        },
+        {
+          "id": "reason_approximation_suffices",
+          "kind": "reason",
+          "optional": false,
+          "statement": "Je kan uitleggen waarom een benadering met een gekende, kleine fout in de praktijk volstaat als oplossing van een vergelijking.",
+          "weight": 1
+        }
+      ],
+      "optional": false,
+      "order": 1000,
+      "parentId": "vergelijkingen-oplossen",
+      "teachingTips": [
+        "For `predict_float_equality`: Lean on `0.1 + 0.2 == 0.3` being False and `0.1 + 0.2` printing 0.30000000000000004; contrast with `0.5 + 0.25 == 0.75`, which is True because halves and quarters are exact in binary. Do not go into bits or IEEE 754: 'the computer stores most decimal fractions slightly rounded' is the level.",
+        "For `write_close_enough`: The test is `abs(a - b) < tolerantie`, with the tolerance as a small number such as 0.001 or 0.000001; probe the forgotten `abs`, which makes every `a` smaller than `b` count as equal.",
+        "For `write_equation_as_function`: Every equation becomes 'find where a function is zero' by moving everything to one side: x³ = x + 1 becomes f(x) = x³ - x - 1. Use equations that the student cannot solve with a formula from class, and also 'where are two functions equal' (cost = revenue).",
+        "For `predict_good_approximation`: Give a candidate x and the value of f(x), or let the student compute it for an easy x, and ask whether it is a solution within a given tolerance; the check is `abs(f(x)) < tolerantie`, not `f(x) == 0`.",
+        "For `write_plot_to_locate_zero`: Draw the function over an interval with `plt.plot` and add `plt.grid()`: the zero is where the line crosses the horizontal axis, and the grid shows between which two round values that happens. The picture gives a rough place, not the answer — that is what the search methods are for.",
+        "For `reason_approximation_suffices`: A measured or modelled quantity is itself only known to a few digits, so an answer with a known, small error is as useful as an exact one — and for most equations no exact formula exists.",
+        "State every formula and every number in the question itself: the student translates and searches, they do not have to know a formula, a derivative rule or the exact solution. When a question asks to trace a method by hand, use at most two or three steps and numbers that stay easy (halves, quarters, small integers). The grader and the student's answer contain only code and text, never the picture: for a graph, ask for the code or for what is drawn where (which points, how many, at which x), never what it 'looks like'. Alternate between mathematics (a cubic, an equation with a sine), science (the time at which a cooling or falling model reaches a value) and economics (break-even with a non-linear cost, an interest rate that gives a wanted final capital).",
+        "Python: goals 1 to 7. New in this subgoal: nothing in the language — only the habit of comparing floats with a tolerance. The methods are written out with `while` and `if` on plain numbers — no scipy, and no numpy inside a search method. Drawing uses the commands of the graphs goal, in the main script: `plt.plot`, `plt.scatter`, `plt.grid()`, `plt.title`, `plt.xlabel`, `plt.ylabel`, `plt.legend()`, `label=`, `color=`, `plt.show()`, with the x values from a loop or from `np.linspace`. `math` (`math.sqrt`, `math.sin`, `math.cos`, `math.pi`), `abs` and `round` are fine. A function is not passed as an argument yet (that comes in the subgoal 'Een functie als argument'): the code calls `f` by its name. Not seen yet: f-strings, `break`, `range` with a step, `lambda`, recursion, `try`/`except`, list comprehensions, dictionaries, string methods. Functions return their result and contain no `print`, `input` or plotting commands; the main script prints and draws."
+      ],
+      "title": "Benaderen in plaats van uitrekenen",
+      "type": "goal"
+    },
+    {
+      "allowChains": true,
+      "contentId": "beslissingen-if-else",
+      "description": "Je kan een if-statement schrijven dat code uitvoert als een voorwaarde waar is, een else-tak toevoegen om tussen twee blokken te kiezen, en voorspellen welke tak uitgevoerd wordt.",
+      "id": "beslissingen-if-else",
+      "moduleId": "python-basics",
+      "objectives": [
+        {
+          "id": "predict_branch_from_comparison",
+          "kind": "predict",
+          "optional": false,
+          "statement": "Je kan voorspellen welke tak uitgevoerd wordt als de voorwaarde een numerieke vergelijking is zoals x > 0.",
+          "weight": 1
+        },
+        {
+          "id": "predict_branch_from_boolean",
+          "kind": "predict",
+          "optional": false,
+          "statement": "Je kan voorspellen welke tak uitgevoerd wordt als de voorwaarde een booleaanse variabele is.",
+          "weight": 1
+        },
+        {
+          "id": "write_if_only",
+          "kind": "apply",
+          "optional": false,
+          "statement": "Je kan een if-statement schrijven dat één blok uitvoert als de voorwaarde waar is.",
+          "weight": 1
+        },
+        {
+          "id": "write_if_else",
+          "kind": "apply",
+          "optional": false,
+          "statement": "Je kan een if/else schrijven dat kiest tussen twee blokken op basis van een voorwaarde.",
+          "weight": 1
+        },
+        {
+          "id": "explain_indent_role",
+          "kind": "reason",
+          "optional": false,
+          "statement": "Je kan uitleggen waarom de insprong bepaalt welke code bij de if-tak hoort.",
+          "weight": 1
+        }
+      ],
+      "optional": false,
+      "order": 2000,
+      "parentId": "condities",
+      "teachingTips": [
+        "For `predict_branch_from_comparison`: Novices often think the condition needs to print or assign something — probe whether they read it as a question with a True/False answer.",
+        "For `write_if_only`, `write_if_else`: Watch for confusion between = and == inside conditions; lean on `if x = 5` as a probe.",
+        "For `explain_indent_role`: Probe block boundaries with a dedented line after the if-block: whether the student sees that it always runs, regardless of the condition, is the indentation deliverable.",
+        "Prefer concrete numeric comparisons over abstract boolean variables for first probes; bring in boolean variables only once comparisons sit.",
+        "Only if and else are to be used at this time. Do not use elif at this point.",
+        "Python: goal 1 plus comparisons, `True`/`False` and `if`/`else`. Not seen yet: `elif`, `and`/`or`/`not`, loops, `+=`, lists, functions (`def`, `return`), f-strings, string methods and `try`/`except`."
+      ],
+      "title": "Beslissingen met if en else",
+      "type": "goal"
+    },
+    {
+      "allowChains": true,
+      "contentId": "bisectie",
+      "description": "Je kan een nulpunt insluiten tussen twee waarden waar de functie een verschillend teken heeft, het interval halveren en de juiste helft kiezen, dat herhalen tot het interval kleiner is dan een tolerantie, voorspellen hoeveel stappen daarvoor nodig zijn, en de opeenvolgende stappen zichtbaar maken op de grafiek van de functie.",
+      "id": "bisectie",
+      "moduleId": "python-basics",
+      "objectives": [
+        {
+          "id": "write_sign_change_test",
+          "kind": "apply",
+          "optional": false,
+          "statement": "Je kan een voorwaarde schrijven die nagaat of een functie tussen a en b van teken wisselt, zoals f(a) * f(b) < 0.",
+          "weight": 1
+        },
+        {
+          "id": "predict_bisection_step",
+          "kind": "predict",
+          "optional": false,
+          "statement": "Je kan voor een gegeven functie en interval voorspellen welk interval overblijft na één bisectiestap.",
+          "weight": 1
+        },
+        {
+          "id": "write_bisection_loop",
+          "kind": "apply",
+          "optional": false,
+          "statement": "Je kan een lus schrijven die het interval blijft halveren tot het smaller is dan een tolerantie en het midden als oplossing geeft.",
+          "weight": 1
+        },
+        {
+          "id": "predict_number_of_steps",
+          "kind": "predict",
+          "optional": false,
+          "statement": "Je kan voorspellen hoe breed het interval is na een aantal bisectiestappen en hoeveel stappen nodig zijn voor een gegeven breedte.",
+          "weight": 1
+        },
+        {
+          "id": "write_plot_bisection_steps",
+          "kind": "apply",
+          "optional": false,
+          "statement": "Je kan de opeenvolgende middens van een bisectie in een lijst bewaren en ze tonen op de grafiek van de functie.",
+          "weight": 1
+        },
+        {
+          "id": "reason_sign_change_required",
+          "kind": "reason",
+          "optional": false,
+          "statement": "Je kan uitleggen waarom bisectie een tekenwissel tussen a en b nodig heeft en wat er zonder kan mislopen.",
+          "weight": 1
+        }
+      ],
+      "optional": false,
+      "order": 2000,
+      "parentId": "vergelijkingen-oplossen",
+      "teachingTips": [
+        "Frame bisection as the guessing game 'hoger, lager' or 'warm, koud': the zero is trapped between a and b, every step looks at the middle and keeps the half that still traps it. It continues the sign change in a value table from the functions goal.",
+        "For `predict_bisection_step`: Give f, a and b with easy numbers and ask for the new interval after one step (at most two steps): compute the midpoint, the sign of f there, and which end moves. Use the test `f(a) * f(m) < 0` — then the zero is in the left half and `b = m`, otherwise `a = m`.",
+        "For `write_bisection_loop`: The loop is `while b - a > tolerantie:` with the midpoint computed inside; the answer is the midpoint of the last interval. Probe the midpoint computed once before the loop, and both ends being moved in the same step.",
+        "For `predict_number_of_steps`: Every step halves the width: from width 1, after 3 steps 0.125, after 10 steps about 0.001. Ask for the width after n steps or how many steps bring a width of 8 below 1 — small numbers, counted by halving, without logarithms.",
+        "For `reason_sign_change_required`: Without a sign change between a and b the method has nothing to hold on to: there may be no zero, or two (f(x) = x² - 1 on [-2, 2]). With a sign change and a graph without jumps there is at least one zero in between, and bisection finds one of them.",
+        "For `write_plot_bisection_steps`: The search function appends every midpoint to a list and returns that list; the main script draws the graph of f and puts the midpoints on the horizontal axis with `plt.scatter(middens, hoogtes)`, where `hoogtes` is a list of zeros of the same length built with a loop. The points crowd together around the zero: that is the halving made visible.",
+        "A step counter next to the loop (`stappen += 1`) may be used to report how many steps a method needed.",
+        "State every formula and every number in the question itself: the student translates and searches, they do not have to know a formula, a derivative rule or the exact solution. When a question asks to trace a method by hand, use at most two or three steps and numbers that stay easy (halves, quarters, small integers). The grader and the student's answer contain only code and text, never the picture: for a graph, ask for the code or for what is drawn where (which points, how many, at which x), never what it 'looks like'. Alternate between mathematics (x³ - x - 1 = 0, cos(x) = x), science and economics, always with the interval given or with a sign change the student can check by filling in two values.",
+        "Python: goals 1 to 7. New in this subgoal: nothing in the language — a `while` with a tolerance. The methods are written out with `while` and `if` on plain numbers — no scipy, and no numpy inside a search method. Drawing uses the commands of the graphs goal, in the main script: `plt.plot`, `plt.scatter`, `plt.grid()`, `plt.title`, `plt.xlabel`, `plt.ylabel`, `plt.legend()`, `label=`, `color=`, `plt.show()`, with the x values from a loop or from `np.linspace`. `math` (`math.sqrt`, `math.sin`, `math.cos`, `math.pi`), `abs` and `round` are fine. A function is not passed as an argument yet (that comes in the subgoal 'Een functie als argument'): the code calls `f` by its name. Not seen yet: f-strings, `break`, `range` with a step, `lambda`, recursion, `try`/`except`, list comprehensions, dictionaries, string methods. Functions return their result and contain no `print`, `input` or plotting commands; the main script prints and draws."
+      ],
+      "title": "Bisectie: het interval halveren",
+      "type": "goal"
+    },
+    {
+      "allowChains": false,
+      "contentId": null,
+      "description": "Je kan vergelijkingen schrijven die True of False opleveren, beslissingen programmeren met if, elif en else, voorwaarden combineren met and, or en not, en met de turtle-module tekeningen maken waarin condities bepalen wat er getekend wordt.",
+      "id": "condities",
+      "moduleId": "python-basics",
+      "objectives": [],
+      "optional": false,
+      "order": 2000,
+      "parentId": null,
+      "teachingTips": [],
+      "title": "Beslissingen programmeren met condities",
+      "type": "goal"
+    },
+    {
+      "allowChains": false,
+      "contentId": null,
+      "description": "Je kan korte Python-scripts schrijven die getallen en tekst uitvoeren, variabelen gebruiken om waarden op te slaan, eenvoudige berekeningen uitvoeren met de standaardoperatoren, en invoer van de gebruiker verwerken.",
+      "id": "eenvoudige-python-scripts",
+      "moduleId": "python-basics",
+      "objectives": [],
+      "optional": false,
+      "order": 1000,
+      "parentId": null,
+      "teachingTips": [],
+      "title": "Eenvoudige Python-scripts schrijven en begrijpen",
+      "type": "goal"
+    },
+    {
+      "allowChains": true,
+      "contentId": "eerste-grafiek",
+      "description": "Je kan matplotlib importeren, uit een lijst x-waarden en een lijst y-waarden een lijngrafiek of een puntenwolk tekenen, voorspellen welke punten getekend worden, en kiezen tussen een lijn en losse punten.",
+      "id": "eerste-grafiek",
+      "moduleId": "python-basics",
+      "objectives": [
+        {
+          "id": "write_line_plot",
+          "kind": "apply",
+          "optional": false,
+          "statement": "Je kan een script schrijven dat uit een lijst x-waarden en een lijst y-waarden een lijngrafiek tekent en toont.",
+          "weight": 1
+        },
+        {
+          "id": "predict_plotted_points",
+          "kind": "predict",
+          "optional": false,
+          "statement": "Je kan voorspellen door welke punten de lijn van plt.plot(x, y) gaat en welke lijst op welke as komt.",
+          "weight": 1
+        },
+        {
+          "id": "predict_length_mismatch",
+          "kind": "predict",
+          "optional": false,
+          "statement": "Je kan herkennen dat plt.plot een ValueError geeft als de lijst met x-waarden en de lijst met y-waarden niet even lang zijn.",
+          "weight": 1
+        },
+        {
+          "id": "predict_plot_single_list",
+          "kind": "predict",
+          "optional": false,
+          "statement": "Je kan voorspellen welke x-waarden plt.plot gebruikt als je maar één lijst meegeeft.",
+          "weight": 1
+        },
+        {
+          "id": "write_scatter_plot",
+          "kind": "apply",
+          "optional": false,
+          "statement": "Je kan met plt.scatter losse punten tekenen in plaats van een lijn.",
+          "weight": 1
+        },
+        {
+          "id": "reason_line_vs_points",
+          "kind": "reason",
+          "optional": false,
+          "statement": "Je kan uitleggen wanneer je gegevens beter als lijn tekent en wanneer als losse punten.",
+          "weight": 1
+        }
+      ],
+      "optional": false,
+      "order": 1000,
+      "parentId": "grafieken",
+      "teachingTips": [
+        "Every script has the same skeleton: `import matplotlib.pyplot as plt` at the top, one or more drawing commands, and `plt.show()` as the last line — like `turtle.done()`, without it no window appears. `as plt` only gives the module a shorter name.",
+        "For `predict_plotted_points`: The first list holds the x values, the second the y values, and they are paired by position: probe which points `plt.plot([1, 2, 3], [5, 0, 4])` connects, and that swapping the two lists mirrors the graph.",
+        "For `predict_length_mismatch`: Lean on two lists of different length raising a ValueError ('x and y must have same first dimension') — typically a table loop where one `append` was forgotten or one list was built with a different `range`.",
+        "For `predict_plot_single_list`: With one list, `plt.plot(waarden)` uses the indexes 0, 1, 2, ... as x: probe the x value of the last point (the length minus 1).",
+        "For `reason_line_vs_points`: A line suggests that the values in between exist (a temperature over a day, a balance over the years); separate points fit loose measurements or pairs without an order (height against weight of students). `plt.plot` connects the points in list order, so unsorted x values give a scribble.",
+        "The grader and the student's answer contain only code and text, never the picture. Never ask what the graph 'looks like' in general: ask through which points the line goes, how many points or lines are drawn, which list ends up on which axis, or what a described graph needs in code. Give every list of data literally in the question, with at most about 8 values, and vary the contexts between science (measurements, temperatures, distances) and economics (prices, revenue, savings).",
+        "Python: goals 1 to 6. From matplotlib use only `plt.plot(x, y)`, `plt.plot(y)`, `plt.scatter(x, y)` and `plt.show()` in this subgoal — titles, labels, legends, colours and several lines come in the next subgoal. No numpy (`linspace`, `arange`, arrays), no pandas, no `plt.subplots`, `fig`, `ax` or `savefig`, no format strings like `'ro-'`. Not seen yet: f-strings, `break`, `range` with a step, list comprehensions, dictionaries, string methods, `zip`, `enumerate`. Functions return their result and contain no `print`, `input` or plotting commands; the main script draws."
+      ],
+      "title": "Een eerste grafiek",
+      "type": "goal"
+    },
+    {
+      "allowChains": true,
+      "contentId": "elif-samengestelde-voorwaarden",
+      "description": "Je kan meerdere gevallen onderscheiden met een if/elif/else-keten en voorwaarden combineren met and, or en not.",
+      "id": "elif-samengestelde-voorwaarden",
+      "moduleId": "python-basics",
+      "objectives": [
+        {
+          "id": "predict_elif_branch",
+          "kind": "predict",
+          "optional": false,
+          "statement": "Je kan voorspellen welke tak van een if/elif/else-keten uitgevoerd wordt voor gegeven waarden.",
+          "weight": 1
+        },
+        {
+          "id": "write_elif_chain",
+          "kind": "apply",
+          "optional": false,
+          "statement": "Je kan een if/elif/else-keten schrijven die drie of meer gevallen onderscheidt.",
+          "weight": 1
+        },
+        {
+          "id": "reason_elif_order",
+          "kind": "reason",
+          "optional": false,
+          "statement": "Je kan uitleggen waarom de volgorde van voorwaarden in een elif-keten het resultaat kan veranderen.",
+          "weight": 1
+        },
+        {
+          "id": "predict_compound_result",
+          "kind": "predict",
+          "optional": false,
+          "statement": "Je kan voorspellen of een samengestelde voorwaarde met and, or of not True of False oplevert.",
+          "weight": 1
+        },
+        {
+          "id": "write_compound_condition",
+          "kind": "apply",
+          "optional": false,
+          "statement": "Je kan een samengestelde voorwaarde schrijven met and, or en not.",
+          "weight": 1
+        }
+      ],
+      "optional": false,
+      "order": 3000,
+      "parentId": "condities",
+      "teachingTips": [
+        "For `predict_elif_branch`: Probe the all-true-branches-run misconception: give a chain where two conditions are true and ask what prints — only the first true branch runs.",
+        "For `predict_elif_branch`: Contrast an if/elif/else-keten with a series of separate if-statements on the same example; the behavioral difference is the deliverable.",
+        "For `write_compound_condition`: Watch for `x == 5 or 6`-style conditions: students translate Dutch 'of' literally; surface that `6` is always truthy and show the correct `x == 5 or x == 6`.",
+        "For `predict_elif_branch`: Probe boundary off-by-ones in grade-style chains (`>= 90` vs `> 90`); boundary values make good test inputs.",
+        "Don't overdo it with combining conditions. 3 conditions in one if statement are the absolute maximum.",
+        "Python: goal 1 plus comparisons, `True`/`False`, `if`/`elif`/`else` and `and`/`or`/`not`. Not seen yet: loops, `+=`, lists, functions (`def`, `return`), f-strings, string methods and `try`/`except`."
+      ],
+      "title": "Meer keuzes met elif, and, or en not",
+      "type": "goal"
+    },
+    {
+      "allowChains": true,
+      "contentId": "functie-als-argument",
+      "description": "Je kan een functie doorgeven als argument aan een andere functie, zodat één bisectie-functie elke vergelijking oplost, het verschil voorspellen tussen een functie doorgeven en haar aanroepen, en zo'n algemene functie gebruiken voor een concreet probleem.",
+      "id": "functie-als-argument",
+      "moduleId": "python-basics",
+      "objectives": [
+        {
+          "id": "write_function_parameter",
+          "kind": "apply",
+          "optional": false,
+          "statement": "Je kan een functie schrijven die een andere functie als parameter krijgt en ze binnenin aanroept.",
+          "weight": 1
+        },
+        {
+          "id": "predict_function_vs_call",
+          "kind": "predict",
+          "optional": false,
+          "statement": "Je kan voorspellen wat er misloopt als je bij een aanroep f(x) doorgeeft waar de functie f zelf verwacht wordt.",
+          "weight": 1
+        },
+        {
+          "id": "write_general_bisection",
+          "kind": "apply",
+          "optional": false,
+          "statement": "Je kan bisectie schrijven als functie met de parameters f, a, b en tolerantie, die voor elke functie werkt.",
+          "weight": 1
+        },
+        {
+          "id": "write_use_general_solver",
+          "kind": "apply",
+          "optional": false,
+          "statement": "Je kan een gegeven oplosfunctie gebruiken voor een concreet probleem door de juiste functie te schrijven en door te geven.",
+          "weight": 1
+        },
+        {
+          "id": "reason_one_solver_many_problems",
+          "kind": "reason",
+          "optional": false,
+          "statement": "Je kan uitleggen wat het voordeel is van één algemene oplosfunctie tegenover een aparte lus per vergelijking.",
+          "weight": 1
+        }
+      ],
+      "optional": false,
+      "order": 3000,
+      "parentId": "vergelijkingen-oplossen",
+      "teachingTips": [
+        "Present it as the next step of 'what varies becomes a parameter' from the functions goal: in the bisection loop the only thing that changes from problem to problem is the function, so the function becomes a parameter: `def bisectie(f, a, b, tolerantie):`.",
+        "For `predict_function_vs_call`: `bisectie(kosten, 0, 10, 0.001)` hands over the function itself; `bisectie(kosten(0), 0, 10, 0.001)` first calls it and hands over a number, and inside `f(m)` then raises 'TypeError: 'int' object is not callable' (or 'float'). Probe exactly this difference: the name without parentheses is the function, with parentheses it is its result.",
+        "For `write_function_parameter`: Start with small helpers before bisection: `waardetabel(f, start, stap, aantal)` that returns the list of function values, or `is_tekenwissel(f, a, b)`. Inside the function the parameter is called like any function, `f(x)`, whatever the passed function is named outside.",
+        "For `write_use_general_solver`: The student gets a working `bisectie(f, a, b, tolerantie)` and writes only the function for the problem and the call; the function to pass takes exactly one parameter, so fixed values (a price, a capital) are written inside it or are variables of the main script.",
+        "For `reason_one_solver_many_problems`: One tested solver replaces a copy of the loop per equation: a bug is fixed once, and a new equation costs one small function.",
+        "State every formula and every number in the question itself: the student translates and searches, they do not have to know a formula, a derivative rule or the exact solution. When a question asks to trace a method by hand, use at most two or three steps and numbers that stay easy (halves, quarters, small integers). The grader and the student's answer contain only code and text, never the picture: for a graph, ask for the code or for what is drawn where (which points, how many, at which x), never what it 'looks like'. Use the general solver on contexts from science (when does a cooling cup reach 40 degrees, at which angle does a throw reach a given distance) and economics (the price at which profit is zero, the interest rate at which a savings plan reaches a target).",
+        "Python: goals 1 to 7. New in this subgoal: a function passed as an argument and called through its parameter name. The methods are written out with `while` and `if` on plain numbers — no scipy, and no numpy inside a search method. Drawing uses the commands of the graphs goal, in the main script: `plt.plot`, `plt.scatter`, `plt.grid()`, `plt.title`, `plt.xlabel`, `plt.ylabel`, `plt.legend()`, `label=`, `color=`, `plt.show()`, with the x values from a loop or from `np.linspace`. `math` (`math.sqrt`, `math.sin`, `math.cos`, `math.pi`), `abs` and `round` are fine. Not seen yet: f-strings, `break`, `range` with a step, `lambda`, recursion, `try`/`except`, list comprehensions, dictionaries, string methods. Functions return their result and contain no `print`, `input` or plotting commands; the main script prints and draws."
+      ],
+      "title": "Een functie als argument",
+      "type": "goal"
+    },
+    {
+      "allowChains": true,
+      "contentId": "functiegrafiek",
+      "description": "Je kan de grafiek van een functie tekenen door met een lus een lijst x-waarden en een lijst functiewaarden op te bouwen, voorspellen hoeveel punten er getekend worden, uitleggen waarom meer punten een vloeiendere kromme geven, en twee functies in één figuur vergelijken.",
+      "id": "functiegrafiek",
+      "moduleId": "python-basics",
+      "objectives": [
+        {
+          "id": "write_xy_lists_from_function",
+          "kind": "apply",
+          "optional": false,
+          "statement": "Je kan met een lus een lijst x-waarden en een lijst bijbehorende functiewaarden opbouwen.",
+          "weight": 1
+        },
+        {
+          "id": "write_function_plot",
+          "kind": "apply",
+          "optional": false,
+          "statement": "Je kan de grafiek van een gegeven functie over een gegeven interval tekenen, met titel en aslabels.",
+          "weight": 1
+        },
+        {
+          "id": "predict_number_of_points",
+          "kind": "predict",
+          "optional": false,
+          "statement": "Je kan voorspellen hoeveel punten een lus voor een functiegrafiek oplevert en wat de eerste en de laatste x-waarde zijn.",
+          "weight": 1
+        },
+        {
+          "id": "reason_more_points_smoother",
+          "kind": "reason",
+          "optional": false,
+          "statement": "Je kan uitleggen waarom een functiegrafiek met weinig punten hoekig is en met veel punten vloeiend lijkt.",
+          "weight": 1
+        },
+        {
+          "id": "write_x_values_function",
+          "kind": "apply",
+          "optional": false,
+          "statement": "Je kan een functie schrijven die voor een begin, een einde en een aantal punten de lijst met gelijk verdeelde x-waarden teruggeeft.",
+          "weight": 1
+        },
+        {
+          "id": "write_compare_functions",
+          "kind": "apply",
+          "optional": false,
+          "statement": "Je kan twee functies in één figuur tekenen om ze te vergelijken, zoals kosten en opbrengst.",
+          "weight": 1
+        }
+      ],
+      "optional": false,
+      "order": 3000,
+      "parentId": "grafieken",
+      "teachingTips": [
+        "The graph of a function is the value table from the functions goal, drawn: one loop appends x to one list and `f(x)` to another, then `plt.plot(xs, ys)`. Compute x from the loop index (`x = start + i * stap`), as in the value tables — `range` with a step or with floats has not been introduced.",
+        "For `predict_number_of_points`: Probe the number of points and the last x value: `range(11)` with step 0.5 from 0 gives 11 points and ends at 5.0 — one point more than there are steps.",
+        "For `reason_more_points_smoother`: matplotlib only knows the points it gets and draws straight segments between them: a parabola through 5 points has visible corners, through 200 points it looks curved. The curve is never really curved, and a peak or zero between two points is skipped — the same idea as the step size in the value tables.",
+        "For `write_x_values_function`: The helper `x_waarden(start, einde, aantal)` returns `aantal` evenly spaced values including both ends, so the step is `(einde - start) / (aantal - 1)`; probe the division by `aantal` instead of `aantal - 1`.",
+        "For `write_compare_functions`: Use pairs where the crossing means something: costs and revenue (break-even), two phone plans, two cars that start at different speeds, simple against compound interest. The student draws both and names where to look; reading the exact crossing off the picture is not asked.",
+        "The grader and the student's answer contain only code and text, never the picture. Never ask what the graph 'looks like' in general: ask how many points are drawn, between which x values the graph runs, or what a described graph needs in code. State every formula in the question itself — the student translates it, they do not have to know it — and alternate between mathematics (a quadratic, a sine with `math.sin`), physics (distance or height against time) and economics (cost, revenue, growth of a capital).",
+        "Python: goals 1 to 6 plus `plt.plot`, `plt.scatter`, `plt.show`, `plt.title`, `plt.xlabel`, `plt.ylabel`, `plt.legend()`, `plt.grid()` and the named arguments `label=` and `color=`. No numpy (`linspace`, `arange`, arrays — the student builds the lists with a loop), no pandas, no `plt.subplots`, `fig`, `ax`, `savefig`, `xlim`/`ylim` or format strings. A function is not passed as an argument: the loop calls `f` by its name. Not seen yet: f-strings, `break`, `range` with a step, list comprehensions, `lambda`, dictionaries, string methods, `zip`, `enumerate`. Functions return their result and contain no `print`, `input` or plotting commands; the main script draws."
+      ],
+      "title": "De grafiek van een functie",
+      "type": "goal"
+    },
+    {
+      "allowChains": false,
+      "contentId": null,
+      "description": "Je kan eigen functies schrijven en aanroepen: code een naam geven met def, gegevens doorgeven via parameters, een resultaat teruggeven met return, voorspellen welke variabelen binnen en buiten een functie bestaan, formules uit wiskunde, fysica en economie vertalen naar functies en er waardetabellen mee maken, en een groter probleem opsplitsen in functies die elkaar aanroepen.",
+      "id": "functies",
+      "moduleId": "python-basics",
+      "objectives": [],
+      "optional": false,
+      "order": 5000,
+      "parentId": null,
+      "teachingTips": [],
+      "title": "Functies",
+      "type": "goal"
+    },
+    {
+      "allowChains": true,
+      "contentId": "functies-combineren",
+      "description": "Je kan een groter probleem opsplitsen in functies die elk één taak hebben, functies schrijven die andere functies aanroepen of met lijsten werken, en een functie testen met goed gekozen aanroepen.",
+      "id": "functies-combineren",
+      "moduleId": "python-basics",
+      "objectives": [
+        {
+          "id": "predict_nested_calls",
+          "kind": "predict",
+          "optional": false,
+          "statement": "Je kan voorspellen wat een script oplevert waarin een functie een andere functie aanroept of waarin aanroepen in elkaar genest zijn.",
+          "weight": 1
+        },
+        {
+          "id": "write_function_with_helper",
+          "kind": "apply",
+          "optional": false,
+          "statement": "Je kan een functie schrijven die een andere zelfgeschreven functie als hulpfunctie aanroept.",
+          "weight": 1
+        },
+        {
+          "id": "write_list_function",
+          "kind": "apply",
+          "optional": false,
+          "statement": "Je kan een functie schrijven die een lijst als parameter krijgt en een waarde of een nieuwe lijst teruggeeft.",
+          "weight": 1
+        },
+        {
+          "id": "decompose_into_functions",
+          "kind": "reason",
+          "optional": false,
+          "statement": "Je kan voor een probleem aangeven welke functies je nodig hebt, met voor elke functie haar parameters en wat ze teruggeeft.",
+          "weight": 1
+        },
+        {
+          "id": "choose_function_tests",
+          "kind": "reason",
+          "optional": false,
+          "statement": "Je kan voor een functie aanroepen kiezen die haar goed testen, inclusief randgevallen, en zeggen welk resultaat je bij elke aanroep verwacht.",
+          "weight": 1
+        },
+        {
+          "id": "fix_function_bug",
+          "kind": "apply",
+          "optional": false,
+          "statement": "Je kan een fout in een functie opsporen en verbeteren aan de hand van een aanroep die een verkeerd resultaat geeft.",
+          "weight": 1
+        }
+      ],
+      "optional": false,
+      "order": 6000,
+      "parentId": "functies",
+      "teachingTips": [
+        "For `decompose_into_functions`: Elicit the plan before code on larger tasks: which functions, what goes in (parameters), what comes out (return) — probe decomposition separately from coding, as in probleem-naar-programma.",
+        "For `write_function_with_helper`: Build on functions with one clear task that feed each other: `is_priem(n)` used by `tel_priemgetallen(grens)`, `gemiddelde(lijst)` used by `boven_gemiddelde(lijst)`; watch for helper logic being copy-pasted instead of called.",
+        "For `write_list_function`: For list functions, reuse the patterns from the lists goal (largest, count, filter, search) and have the function return the result instead of printing it; build and return a new list rather than changing the argument.",
+        "Turtle compositions are welcome (`teken_huis(grootte)` calling `teken_vierkant` and `teken_driehoek`); returning two values as a tuple and unpacking them is allowed here.",
+        "Introduce no new mechanics: no recursion, lambda, `global`, try/except, `break` or f-strings. Apart from turtle drawing functions, every function returns its result and only the main script prints."
+      ],
+      "title": "Een probleem opsplitsen in functies",
+      "type": "goal"
+    },
+    {
+      "allowChains": false,
+      "contentId": "functies-definieren",
+      "description": "Je kan met def een functie schrijven die een waarde binnenkrijgt via een parameter en een resultaat teruggeeft met return, ze aanroepen, en het resultaat opslaan, afdrukken of verder gebruiken in een expressie.",
+      "id": "functies-definieren",
+      "moduleId": "python-basics",
+      "objectives": [
+        {
+          "id": "recall_function_parts",
+          "kind": "recall",
+          "optional": false,
+          "statement": "Je kan in een functiedefinitie en een aanroep de naam, de parameter, het argument en de teruggegeven waarde aanwijzen.",
+          "weight": 1
+        },
+        {
+          "id": "predict_return_value",
+          "kind": "predict",
+          "optional": false,
+          "statement": "Je kan voorspellen welke waarde een aanroep zoals dubbel(4) oplevert en wat een expressie met die aanroep als resultaat geeft.",
+          "weight": 1
+        },
+        {
+          "id": "write_function_with_return",
+          "kind": "apply",
+          "optional": false,
+          "statement": "Je kan een functie met één parameter schrijven die een resultaat berekent en teruggeeft met return.",
+          "weight": 1
+        },
+        {
+          "id": "write_use_call_result",
+          "kind": "apply",
+          "optional": false,
+          "statement": "Je kan een gegeven functie aanroepen en het resultaat opslaan in een variabele, afdrukken of in een expressie gebruiken.",
+          "weight": 1
+        },
+        {
+          "id": "predict_def_and_calls",
+          "kind": "predict",
+          "optional": false,
+          "statement": "Je kan voorspellen wat een script toont als het een functie definieert en die nul, één of meerdere keren aanroept.",
+          "weight": 1
+        }
+      ],
+      "optional": false,
+      "order": 1000,
+      "parentId": "functies",
+      "teachingTips": [
+        "Present a function the way students know it from maths: something goes in, something comes out. `def dubbel(x): return 2 * x` is f(x) = 2x with a better name, and a call like `dubbel(4)` is an expression with a value, just like `2 + 3`.",
+        "Every function in this goal returns its result: never put `print` or `input` inside a function body. Printing happens in the main script, on the returned value (`print(dubbel(4))`).",
+        "For `predict_def_and_calls`: Probe that `def` only defines: a script that defines a function and never calls it shows nothing, a bare `dubbel(4)` line computes a value that is thrown away, and a call placed above the definition raises a NameError.",
+        "Use descriptive Dutch names instead of f and g (`dubbel`, `kwadraat`, `naar_fahrenheit`, `btw`), so that several functions in one script stay apart.",
+        "Stay with one parameter and a single `return` at the end of the body here — several parameters come in the next subgoal, early returns later. No docstrings, type hints, f-strings, default values or lambda."
+      ],
+      "title": "Een functie schrijven en aanroepen",
+      "type": "goal"
+    },
+    {
+      "allowChains": true,
+      "contentId": "geneste-lussen",
+      "description": "Je kan een lus in een lus schrijven om paren uit een lijst te overlopen, voorspellen hoe vaak de binnenste lus loopt, en een raster als lijst van lijsten doorlopen en aanpassen met rooster[r][k].",
+      "id": "geneste-lussen",
+      "moduleId": "python-basics",
+      "objectives": [
+        {
+          "id": "predict_nested_loop_output",
+          "kind": "predict",
+          "optional": false,
+          "statement": "Je kan voorspellen welke uitvoer een geneste lus geeft en hoe vaak de binnenste lus loopt.",
+          "weight": 1
+        },
+        {
+          "id": "write_all_pairs",
+          "kind": "apply",
+          "optional": false,
+          "statement": "Je kan een geneste lus schrijven die paren elementen uit een lijst vergelijkt.",
+          "weight": 1
+        },
+        {
+          "id": "reason_unique_pairs",
+          "kind": "reason",
+          "optional": false,
+          "statement": "Je kan uitleggen waarom range(i + 1, len(lijst)) in de binnenste lus elk paar maar één keer oplevert.",
+          "weight": 1
+        },
+        {
+          "id": "predict_grid_index",
+          "kind": "predict",
+          "optional": false,
+          "statement": "Je kan voorspellen welk element rooster[r][k] oplevert in een lijst van lijsten.",
+          "weight": 1
+        },
+        {
+          "id": "write_grid_traversal",
+          "kind": "apply",
+          "optional": false,
+          "statement": "Je kan een lijst van lijsten rij per rij doorlopen, bijvoorbeeld om een raster af te drukken of een totaal te berekenen.",
+          "weight": 1
+        }
+      ],
+      "optional": false,
+      "order": 6000,
+      "parentId": "lijsten-tuples",
+      "teachingTips": [
+        "For `predict_nested_loop_output`: Probe iteration counts by tracing small lists and counting, not with a formula.",
+        "For `predict_grid_index`: Watch for rows and columns being swapped: in `rooster[r][k]` the first index selects the row.",
+        "For `write_all_pairs`, `reason_unique_pairs`: Probe pairing an element with itself when both loops start at 0, and contrast with an inner loop starting at `i + 1`.",
+        "Build grids with literals or with append in a loop; avoid `[[0]*n]*m` — list repetition has not been introduced and it hides an aliasing trap.",
+        "Python: goals 1 to 3 plus lists and strings with indexing (also negative), slicing and `len`, the list methods `append`, `insert`, `pop`, `remove` and `sort`, `in`, and `min`, `max` and `sum`, and `for` over a list, a string or `range(len(...))`, plus tuples, nested loops and lists of lists. Not seen yet: functions (`def`, `return`) — a list algorithm is a plain script, not a function —, `break`, `range` with a step, `enumerate`, `zip`, list comprehensions, dictionaries, sets, f-strings, string methods and `try`/`except`."
+      ],
+      "title": "Geneste lussen en lijsten van lijsten",
+      "type": "goal"
+    },
+    {
+      "allowChains": true,
+      "contentId": "grafiek-afwerken",
+      "description": "Je kan een grafiek een titel en aslabels met eenheden geven, meerdere lijnen in één figuur tekenen met een legende, kleur en raster instellen, en voorspellen wat een script wel en niet in de figuur zet.",
+      "id": "grafiek-afwerken",
+      "moduleId": "python-basics",
+      "objectives": [
+        {
+          "id": "write_title_and_axis_labels",
+          "kind": "apply",
+          "optional": false,
+          "statement": "Je kan een grafiek een titel en aslabels met eenheden geven met plt.title, plt.xlabel en plt.ylabel.",
+          "weight": 1
+        },
+        {
+          "id": "write_multiple_lines_legend",
+          "kind": "apply",
+          "optional": false,
+          "statement": "Je kan meerdere lijnen in één figuur tekenen en ze met label= en plt.legend() een legende geven.",
+          "weight": 1
+        },
+        {
+          "id": "predict_figure_contents",
+          "kind": "predict",
+          "optional": false,
+          "statement": "Je kan van een script voorspellen hoeveel lijnen de figuur toont en welke tekst waar terechtkomt.",
+          "weight": 1
+        },
+        {
+          "id": "predict_commands_after_show",
+          "kind": "predict",
+          "optional": false,
+          "statement": "Je kan voorspellen dat opdrachten die na plt.show() staan niet meer in de getoonde figuur komen.",
+          "weight": 1
+        },
+        {
+          "id": "write_color_and_grid",
+          "kind": "apply",
+          "optional": true,
+          "statement": "Je kan een lijn een kleur geven met color= en een raster toevoegen met plt.grid().",
+          "weight": 1
+        },
+        {
+          "id": "reason_what_reader_needs",
+          "kind": "reason",
+          "optional": false,
+          "statement": "Je kan voor een beschreven grafiek aangeven welke titel, aslabels, eenheden en legende een lezer nodig heeft om hem te begrijpen.",
+          "weight": 1
+        }
+      ],
+      "optional": false,
+      "order": 2000,
+      "parentId": "grafieken",
+      "teachingTips": [
+        "Introduce the named argument here: `label=\"kosten\"` and `color=\"red\"` are arguments passed by name instead of by position, after the positional ones. It is the calling side of the default values from the functions goal; do not let students define functions with keyword-only tricks.",
+        "For `write_multiple_lines_legend`: Each `plt.plot` call adds one line to the same figure; a line gets its legend text through `label=...` and the legend only appears after `plt.legend()`. Probe the forgotten `plt.legend()` and the legend call without any labels.",
+        "For `predict_commands_after_show`: `plt.show()` shows the figure as it is at that moment and waits until the window is closed; a `plt.title` or `plt.plot` placed after it never appears in that figure.",
+        "For `predict_figure_contents`: Give a short script and ask how many lines the figure has, which text is on which axis, or which line gets which legend text — one of these per question.",
+        "For `reason_what_reader_needs`: Describe a bare graph (two lines, numbers on the axes, nothing else) with its context and ask what a reader cannot know; the answer is about quantities and units on the axes and which line is which, not about decoration.",
+        "The grader and the student's answer contain only code and text, never the picture. Never ask what the graph 'looks like' in general: ask how many lines are drawn, which text appears where, or what a described graph needs in code. Give every list of data literally in the question, with at most about 8 values, and vary the contexts between science (two measurement series, temperatures in two cities) and economics (costs against revenue, two savings plans).",
+        "Python: goals 1 to 6 plus `plt.plot`, `plt.scatter` and `plt.show`. New in this subgoal: `plt.title`, `plt.xlabel`, `plt.ylabel`, `plt.legend()`, `plt.grid()` and the named arguments `label=` and `color=` (colour names in English: \"red\", \"blue\", \"green\", \"orange\", \"black\"). No numpy, no pandas, no `plt.subplots`, `fig`, `ax`, `savefig`, `xlim`/`ylim`, `linestyle`, `marker` or format strings like `'ro-'`. Not seen yet: f-strings, `break`, `range` with a step, list comprehensions, dictionaries, string methods, `zip`, `enumerate`. Functions return their result and contain no `print`, `input` or plotting commands; the main script draws."
+      ],
+      "title": "Een grafiek leesbaar maken",
+      "type": "goal"
+    },
+    {
+      "allowChains": false,
+      "contentId": null,
+      "description": "Je kan met matplotlib gegevens en functies zichtbaar maken: een lijngrafiek of puntenwolk tekenen uit twee lijsten, een grafiek leesbaar maken met titel, aslabels en legende, de grafiek van een functie opbouwen uit een zelfgemaakte waardetabel, de uitkomsten van een telling of simulatie tonen in een staafdiagram of histogram, en met numpy in één keer rekenen op een hele reeks waarden.",
+      "id": "grafieken",
+      "moduleId": "python-basics",
+      "objectives": [],
+      "optional": false,
+      "order": 7000,
+      "parentId": null,
+      "teachingTips": [],
+      "title": "Grafieken maken",
+      "type": "goal"
+    },
+    {
+      "allowChains": false,
+      "contentId": "herhalen-for",
+      "description": "Je kan een for-lus met range schrijven om een bewerking een vast aantal keer te herhalen, de uitvoer van zo'n lus voorspellen, een resultaat opbouwen in een variabele, en met turtle regelmatige figuren tekenen.",
+      "id": "herhalen-for",
+      "moduleId": "python-basics",
+      "objectives": [
+        {
+          "id": "recall_range_bounds",
+          "kind": "recall",
+          "optional": false,
+          "statement": "Je kan benoemen welke getallen range(n) en range(a, b) opleveren.",
+          "weight": 1
+        },
+        {
+          "id": "predict_for_output",
+          "kind": "predict",
+          "optional": false,
+          "statement": "Je kan voorspellen wat een for-lus met range als uitvoer geeft.",
+          "weight": 1
+        },
+        {
+          "id": "write_for_loop",
+          "kind": "apply",
+          "optional": false,
+          "statement": "Je kan een for-lus schrijven die een bewerking een vast aantal keer herhaalt.",
+          "weight": 1
+        },
+        {
+          "id": "write_for_accumulator",
+          "kind": "apply",
+          "optional": false,
+          "statement": "Je kan een for-lus schrijven die een resultaat opbouwt in een variabele, zoals een som of een teller.",
+          "weight": 1
+        },
+        {
+          "id": "write_turtle_polygon",
+          "kind": "apply",
+          "optional": false,
+          "statement": "Je kan met een for-lus en turtle een regelmatige veelhoek of ster tekenen.",
+          "weight": 1
+        }
+      ],
+      "optional": false,
+      "order": 1000,
+      "parentId": "herhaling",
+      "teachingTips": [
+        "For `recall_range_bounds`: Probe the range off-by-one two ways: how many times does the body run, and what is the loop variable's last value — these are separate failure modes.",
+        "For `predict_for_output`: Trace the loop variable inside the body: probe whether the student sees that it takes a new value each iteration rather than only its final value.",
+        "For `write_turtle_polygon`: For turtle polygons, lean on the exterior-angle mistake: for a triangle students turn 60 degrees (the interior angle) instead of 120 — eliciting the 360/n rule is the deliverable.",
+        "For `write_for_accumulator`: Tie the accumulator pattern back to `x = x + 1` from the variables subgoal; probe right-to-left reading of `totaal = totaal + getal`. The lesson then shows `+=` and `-=` as shorthand for the same update; both forms may appear from here on, and when a student misreads the shorthand, have them write it out in the long form.",
+        "Python: goals 1 and 2 plus `for` with `range(n)` or `range(a, b)`, and `+=`/`-=`. A `for` loops over a `range`, not over a list or a string. Not seen yet: `while`, `range` with a step, `break`, lists and tuples, indexing, `len`, functions (`def`, `return`), f-strings, string methods and `try`/`except`."
+      ],
+      "title": "Herhalen met for en range",
+      "type": "goal"
+    },
+    {
+      "allowChains": false,
+      "contentId": "herhalen-while",
+      "description": "Je kan een while-lus schrijven die herhaalt zolang een voorwaarde waar is, voorspellen wanneer zo'n lus stopt, oneindige lussen herkennen, en een lus gebruiken om invoer te valideren.",
+      "id": "herhalen-while",
+      "moduleId": "python-basics",
+      "objectives": [
+        {
+          "id": "predict_while_output",
+          "kind": "predict",
+          "optional": false,
+          "statement": "Je kan voorspellen wat een while-lus als uitvoer geeft en wanneer hij stopt.",
+          "weight": 1
+        },
+        {
+          "id": "write_while_loop",
+          "kind": "apply",
+          "optional": false,
+          "statement": "Je kan een while-lus schrijven die herhaalt zolang een voorwaarde waar is.",
+          "weight": 1
+        },
+        {
+          "id": "predict_infinite_loop",
+          "kind": "predict",
+          "optional": false,
+          "statement": "Je kan herkennen wanneer een while-lus nooit zal stoppen.",
+          "weight": 1
+        },
+        {
+          "id": "write_input_validation",
+          "kind": "apply",
+          "optional": false,
+          "statement": "Je kan een while-lus schrijven die invoer blijft opvragen tot de gebruiker iets geldigs typt.",
+          "weight": 1
+        },
+        {
+          "id": "reason_for_vs_while",
+          "kind": "reason",
+          "optional": false,
+          "statement": "Je kan uitleggen wanneer je een for-lus dan wel een while-lus kiest.",
+          "weight": 1
+        }
+      ],
+      "optional": false,
+      "order": 2000,
+      "parentId": "herhaling",
+      "teachingTips": [
+        "For `predict_infinite_loop`: Probe infinite-loop recognition with a counter that never updates inside the body; the update line is the load-bearing insight.",
+        "For `write_while_loop`, `write_input_validation`: Students negate conditions wrongly when the task says 'stop wanneer' — probe translation of 'totdat' phrasing into a 'zolang' condition.",
+        "For `predict_while_output`: Surface that the condition is checked only at the top of each iteration, not continuously — probe with a script that makes the condition false mid-body.",
+        "For `write_input_validation`: For input validation, combine while with the int/float conversion from goal 1; keep try/except out of scope.",
+        "Python: goals 1 and 2 plus `for` with `range`, `while`, and `+=`/`-=`. Not seen yet: `break`, `range` with a step, lists and tuples, indexing, `len`, functions (`def`, `return`), f-strings, string methods such as `isdigit()`, and `try`/`except`: an input check converts with `int()` and compares the number."
+      ],
+      "title": "Herhalen met while",
+      "type": "goal"
+    },
+    {
+      "allowChains": false,
+      "contentId": null,
+      "description": "Je kan herhalingen implementeren met for en while, programma's systematisch testen en debuggen met verschillende testgevallen, en complexere probleemstellingen vertalen naar werkende Python-code, ook met turtle-tekeningen.",
+      "id": "herhaling",
+      "moduleId": "python-basics",
+      "objectives": [],
+      "optional": false,
+      "order": 3000,
+      "parentId": null,
+      "teachingTips": [],
+      "title": "Herhalingen programmeren met lussen",
+      "type": "goal"
+    },
+    {
+      "allowChains": false,
+      "contentId": "invoer-input",
+      "description": "Je kan met input() een waarde van de gebruiker opvragen met een duidelijke prompt, het resultaat opslaan in een variabele, en de invoer omzetten naar int of float wanneer rekenwerk nodig is.",
+      "id": "invoer-input",
+      "moduleId": "python-basics",
+      "objectives": [
+        {
+          "id": "write_input_call",
+          "kind": "apply",
+          "optional": false,
+          "statement": "Je kan een input()-aanroep schrijven met een duidelijke prompt en het resultaat opslaan in een variabele.",
+          "weight": 1
+        },
+        {
+          "id": "recall_input_returns_string",
+          "kind": "recall",
+          "optional": false,
+          "statement": "Je kan benoemen dat input() altijd een string teruggeeft, ook als de gebruiker een getal typt.",
+          "weight": 1
+        },
+        {
+          "id": "write_input_with_conversion",
+          "kind": "apply",
+          "optional": false,
+          "statement": "Je kan invoer omzetten naar een int of float wanneer er met de waarde gerekend moet worden.",
+          "weight": 1
+        },
+        {
+          "id": "predict_unconverted_input_bug",
+          "kind": "predict",
+          "optional": false,
+          "statement": "Je kan voorspellen wat er gebeurt als rauwe input zonder conversie in een rekenkundige expressie wordt gebruikt.",
+          "weight": 1
+        },
+        {
+          "id": "predict_conversion_error",
+          "kind": "predict",
+          "optional": false,
+          "statement": "Je kan voorspellen wanneer int() of float() een ValueError geeft op gebruikersinvoer.",
+          "weight": 1
+        }
+      ],
+      "optional": false,
+      "order": 4000,
+      "parentId": "eenvoudige-python-scripts",
+      "teachingTips": [
+        "For `recall_input_returns_string`: When probing the return type of `input()`, set up the question so the student commits to a prediction before seeing the runtime answer — the 'input always returns a string' shock is the load-bearing insight here.",
+        "For `predict_conversion_error`: Belgian students will type `3,14` at a `float()` prompt and hit `ValueError`; expose this case explicitly when calibration warrants and tie it to the same comma-vs-dot rule from the variables and arithmetic subgoals.",
+        "For `predict_unconverted_input_bug`: Probe the missing-conversion bug with two-input addition (`a = input(); b = input(); print(a + b)`); the visible string concatenation ('53' for inputs 5 and 3) is more diagnostic than a hard `TypeError` because the student has to explain why it's not 8.",
+        "Stay within bare `input` + `int`/`float` conversion in this subgoal — `try`/`except`, validation loops, and `split()` belong later.",
+        "Python: `print`, variables, arithmetic, and `input` with `int()` or `float()`. Not seen yet: comparisons, `if`, loops, `+=`, lists, functions (`def`, `return`), f-strings, string methods such as `split()`, and `try`/`except`."
+      ],
+      "title": "Invoer met input",
+      "type": "goal"
+    },
+    {
+      "allowChains": true,
+      "contentId": "kans-schatten",
+      "description": "Je kan een toevalsexperiment vele keren herhalen, tellen hoe vaak een gebeurtenis voorkomt en zo haar kans schatten, bijhouden hoe vaak elke uitkomst valt, en uitleggen waarom meer herhalingen een betrouwbaardere schatting geven.",
+      "id": "kans-schatten",
+      "moduleId": "python-basics",
+      "objectives": [
+        {
+          "id": "write_estimate_chance",
+          "kind": "apply",
+          "optional": false,
+          "statement": "Je kan een functie schrijven die een experiment een gegeven aantal keer herhaalt, de successen telt en het aandeel successen teruggeeft.",
+          "weight": 1
+        },
+        {
+          "id": "predict_estimate_value",
+          "kind": "predict",
+          "optional": false,
+          "statement": "Je kan van een script dat de kans op een eenvoudige gebeurtenis schat voorspellen rond welke waarde de uitvoer ligt en dat die bij elke run een beetje verschilt.",
+          "weight": 1
+        },
+        {
+          "id": "reason_more_repetitions",
+          "kind": "reason",
+          "optional": false,
+          "statement": "Je kan uitleggen waarom een schatting met veel herhalingen betrouwbaarder is dan een met weinig herhalingen.",
+          "weight": 1
+        },
+        {
+          "id": "write_frequency_list",
+          "kind": "apply",
+          "optional": false,
+          "statement": "Je kan met een lijst van tellers bijhouden hoe vaak elke uitkomst van een experiment voorkomt.",
+          "weight": 1
+        },
+        {
+          "id": "reason_model_the_mechanism",
+          "kind": "reason",
+          "optional": false,
+          "statement": "Je kan uitleggen waarom je de som van twee dobbelstenen naspeelt met twee worpen en niet met één toevalsgetal van 2 tot 12.",
+          "weight": 1
+        },
+        {
+          "id": "fix_estimate_bug",
+          "kind": "apply",
+          "optional": false,
+          "statement": "Je kan een fout in een schattingsscript opsporen en verbeteren, zoals een teller die binnen de lus opnieuw op nul gezet wordt of een deling door het verkeerde aantal.",
+          "weight": 1
+        }
+      ],
+      "optional": false,
+      "order": 2000,
+      "parentId": "toeval-simulatie",
+      "teachingTips": [
+        "Build every estimate from the same three parts and name them: one experiment, a counter, and the division by the number of repetitions. The function takes the number of repetitions as a parameter and returns the estimate. Vary the experiment: coins and dice, but also a product that is defective with a given chance, a free throw that goes in 70 percent of the time, a seed that germinates.",
+        "For `fix_estimate_bug`: Probe the classic bugs: the counter set to zero inside the loop, the number of repetitions divided by the counter, failures counted instead of successes, and a `return` indented inside the loop so that only one repetition runs.",
+        "For `reason_more_repetitions`: For the repetitions LO, contrast 10 with 10 000 repetitions of the same experiment: with 10 an estimate of 0.3 or 0.7 for a fair coin is normal, with 10 000 it is not. Do not use the terms 'wet van de grote aantallen', variance or standard deviation.",
+        "For `write_frequency_list`: For the frequency list, index a list of counters with the outcome (`tellingen[worp]`, with an unused position 0 for a die) and update with `tellingen[worp] = tellingen[worp] + 1`. The sum of two dice counted this way shows why 7 comes up more often than 2 or 12: there are more ways to throw it.",
+        "The output of these scripts is random, so never ask for 'the output': ask which results are possible or impossible, around which value an estimate lies, or give the random values that were drawn and ask what happens then. State every rule of the game or situation in the question itself: the student must not need probability theory, and the only chances taken as known are a fair coin (1 in 2) and a fair die (1 in 6).",
+        "From the random module use only `random.randint`, `random.random` and `random.choice` — no uniform, shuffle, sample, choices or seed. Everything else stays within the earlier goals: no numpy, f-strings, `break`, list comprehensions, dictionaries, sets or string methods. Functions return their result and contain no `print` or `input`; the main script prints."
+      ],
+      "title": "Een kans schatten door te herhalen",
+      "type": "goal"
+    },
+    {
+      "allowChains": false,
+      "contentId": "klein-script",
+      "description": "Je kan de eerder behandelde bouwstenen — input, variabelen, rekenen, print — combineren tot een klein, werkend Python-script dat een probleem in natuurlijke taal oplost, en kan zo'n script lezen, traceren en debuggen.",
+      "id": "klein-script",
+      "moduleId": "python-basics",
+      "objectives": [
+        {
+          "id": "write_simple_script",
+          "kind": "apply",
+          "optional": false,
+          "statement": "Je kan een klein script schrijven dat één of meerdere invoeren ophaalt, een berekening uitvoert, en het resultaat toont.",
+          "weight": 1
+        },
+        {
+          "id": "predict_script_output",
+          "kind": "predict",
+          "optional": false,
+          "statement": "Je kan voorspellen wat een gegeven klein script als uitvoer geeft voor een specifieke gebruikersinvoer.",
+          "weight": 1
+        },
+        {
+          "id": "predict_script_runtime_error",
+          "kind": "predict",
+          "optional": false,
+          "statement": "Je kan voorspellen wanneer een klein script tijdens uitvoering een fout zal geven.",
+          "weight": 1
+        },
+        {
+          "id": "fix_simple_script_bug",
+          "kind": "apply",
+          "optional": false,
+          "statement": "Je kan een veelvoorkomende fout in een klein script herkennen en oplossen.",
+          "weight": 1
+        }
+      ],
+      "optional": false,
+      "order": 5000,
+      "parentId": "eenvoudige-python-scripts",
+      "teachingTips": [
+        "For `fix_simple_script_bug`: Probe the silent-wrong-output bug in script context: a script where `print(a + b)` on raw input yields string concatenation rather than a sum is the canonical diagnostic — harder to spot than the same bug in isolation.",
+        "For `write_simple_script`: When the script-writing prompt is in natural Dutch ('het gemiddelde van twee getallen'), expect translation errors at the operator level — `a + b / 2` instead of `(a + b) / 2`. Probe the parentheses issue separately when the student gets the structure right but the precedence wrong.",
+        "Don't introduce any new mechanics in this subgoal — the integrative skill is composing print, variables, arithmetic and input cleanly. Python: only `print`, variables, the arithmetic operators and `input` with `int()` or `float()`. Not seen yet: comparisons, `if`, loops, `+=`, lists, functions (`def`, `return`), f-strings, string methods and `try`/`except`."
+      ],
+      "title": "Een klein script samenstellen",
+      "type": "goal"
+    },
+    {
+      "allowChains": false,
+      "contentId": "lijsten-aanpassen",
+      "description": "Je kan een lijst laten groeien en krimpen met append, insert, remove en pop, met in controleren of een waarde erin zit, en sum, min, max en sort gebruiken.",
+      "id": "lijsten-aanpassen",
+      "moduleId": "python-basics",
+      "objectives": [
+        {
+          "id": "predict_list_after_methods",
+          "kind": "predict",
+          "optional": false,
+          "statement": "Je kan voorspellen hoe een lijst eruitziet na een reeks append-, insert-, remove- en pop-aanroepen.",
+          "weight": 1
+        },
+        {
+          "id": "write_list_methods",
+          "kind": "apply",
+          "optional": false,
+          "statement": "Je kan de juiste methode kiezen en schrijven om een element toe te voegen, in te voegen of te verwijderen.",
+          "weight": 1
+        },
+        {
+          "id": "recall_remove_vs_pop",
+          "kind": "recall",
+          "optional": false,
+          "statement": "Je kan het verschil benoemen tussen remove (verwijdert een waarde) en pop (verwijdert op een positie).",
+          "weight": 1
+        },
+        {
+          "id": "predict_in_membership",
+          "kind": "predict",
+          "optional": false,
+          "statement": "Je kan voorspellen of waarde in lijst True of False oplevert.",
+          "weight": 1
+        },
+        {
+          "id": "write_list_builtins",
+          "kind": "apply",
+          "optional": false,
+          "statement": "Je kan sum(), min(), max() en len() gebruiken om een lijst samen te vatten, bijvoorbeeld tot een gemiddelde.",
+          "weight": 1
+        },
+        {
+          "id": "predict_sort_in_place",
+          "kind": "predict",
+          "optional": false,
+          "statement": "Je kan voorspellen dat lijst.sort() de lijst zelf sorteert en niets teruggeeft.",
+          "weight": 1
+        }
+      ],
+      "optional": false,
+      "order": 2000,
+      "parentId": "lijsten-tuples",
+      "teachingTips": [
+        "For `recall_remove_vs_pop`: Probe remove-vs-pop confusion with lists whose values overlap with valid indexes, so the two readings give different results.",
+        "For `predict_sort_in_place`: Lean on `lijst = lijst.append(x)` and `lijst = lijst.sort()` as probes: these methods change the list in place and return None.",
+        "For `predict_list_after_methods`: Probe that remove deletes only the first occurrence and raises a ValueError when the value is missing; in the feedback, mention `in` as a guard (not as a second pitfall in the question).",
+        "Keep sorted(), extend, index() and count() out of scope; a `for i in range(n)` loop with append is fine, but looping over the list itself belongs to the next subgoal.",
+        "Python: goals 1 to 3 plus lists and strings with indexing (also negative), slicing and `len`, the list methods `append`, `insert`, `pop`, `remove` and `sort`, `in`, and `min`, `max` and `sum`. Not seen yet: functions (`def`, `return`) — a list algorithm is a plain script, not a function —, `break`, `range` with a step, `enumerate`, `zip`, list comprehensions, dictionaries, sets, f-strings, string methods and `try`/`except`."
+      ],
+      "title": "Lijsten aanpassen met methodes",
+      "type": "goal"
+    },
+    {
+      "allowChains": true,
+      "contentId": "lijsten-doorlopen",
+      "description": "Je kan met een for-lus elk element van een lijst of string verwerken, kiezen tussen een lus over de elementen en een lus over de indexen, een nieuwe lijst opbouwen door te filteren of om te zetten, en met turtle tekenen op basis van een lijst.",
+      "id": "lijsten-doorlopen",
+      "moduleId": "python-basics",
+      "objectives": [
+        {
+          "id": "predict_for_over_list",
+          "kind": "predict",
+          "optional": false,
+          "statement": "Je kan voorspellen wat een for-lus over een lijst of string als uitvoer geeft.",
+          "weight": 1
+        },
+        {
+          "id": "write_index_loop",
+          "kind": "apply",
+          "optional": false,
+          "statement": "Je kan een lus over range(len(lijst)) schrijven wanneer je de index nodig hebt, bijvoorbeeld om elementen aan te passen of buren te vergelijken.",
+          "weight": 1
+        },
+        {
+          "id": "write_build_new_list",
+          "kind": "apply",
+          "optional": false,
+          "statement": "Je kan in een lus een nieuwe lijst opbouwen door elementen te filteren of om te zetten.",
+          "weight": 1
+        },
+        {
+          "id": "predict_loop_variable_copy",
+          "kind": "predict",
+          "optional": false,
+          "statement": "Je kan voorspellen dat het aanpassen van x in for x in lijst de lijst zelf niet verandert.",
+          "weight": 1
+        },
+        {
+          "id": "reason_element_vs_index_loop",
+          "kind": "reason",
+          "optional": false,
+          "statement": "Je kan uitleggen wanneer je over de elementen loopt en wanneer over de indexen.",
+          "weight": 1
+        },
+        {
+          "id": "write_turtle_from_list",
+          "kind": "apply",
+          "optional": true,
+          "statement": "Je kan met turtle een figuur tekenen waarbij elke zijde haar lengte of kleur uit een lijst haalt.",
+          "weight": 1
+        }
+      ],
+      "optional": false,
+      "order": 3000,
+      "parentId": "lijsten-tuples",
+      "teachingTips": [
+        "For `reason_element_vs_index_loop`: Watch for `for i in lijst` followed by `lijst[i]` — the student treats the element as an index; use meaningful loop-variable names in examples.",
+        "For `predict_loop_variable_copy`: Probe in-place changes: `x = x * 2` inside an element loop leaves the list unchanged, an index loop with `lijst[i] = ...` does not.",
+        "For `write_build_new_list`: When building a new list, watch for the empty result list being initialised inside the loop.",
+        "Vary between lists of numbers, lists of words and strings; for turtle, stay within t.forward, t.left, t.right and t.pencolor — no goto.",
+        "Python: goals 1 to 3 plus lists and strings with indexing (also negative), slicing and `len`, the list methods `append`, `insert`, `pop`, `remove` and `sort`, `in`, and `min`, `max` and `sum`, and `for` over a list, a string or `range(len(...))`. Not seen yet: functions (`def`, `return`) — a list algorithm is a plain script, not a function —, `break`, `range` with a step, `enumerate`, `zip`, list comprehensions, dictionaries, sets, f-strings, string methods and `try`/`except`."
+      ],
+      "title": "Lijsten en strings doorlopen",
+      "type": "goal"
+    },
+    {
+      "allowChains": false,
+      "contentId": "lijsten-indexeren",
+      "description": "Je kan een lijst aanmaken, elementen opvragen en aanpassen via hun index (ook negatief), een deel eruit halen met slicing, en een string op dezelfde manier indexeren als een reeks tekens.",
+      "id": "lijsten-indexeren",
+      "moduleId": "python-basics",
+      "objectives": [
+        {
+          "id": "predict_index_value",
+          "kind": "predict",
+          "optional": false,
+          "statement": "Je kan voorspellen welk element lijst[i] oplevert, ook bij een negatieve index.",
+          "weight": 1
+        },
+        {
+          "id": "predict_index_error",
+          "kind": "predict",
+          "optional": false,
+          "statement": "Je kan met len() bepalen welke indexen geldig zijn en herkennen wanneer een index een IndexError geeft.",
+          "weight": 1
+        },
+        {
+          "id": "write_modify_by_index",
+          "kind": "apply",
+          "optional": false,
+          "statement": "Je kan een element van een lijst vervangen via zijn index.",
+          "weight": 1
+        },
+        {
+          "id": "write_slice",
+          "kind": "apply",
+          "optional": false,
+          "statement": "Je kan een slice schrijven die een gevraagd deel uit een lijst of string haalt.",
+          "weight": 1
+        },
+        {
+          "id": "predict_string_index",
+          "kind": "predict",
+          "optional": false,
+          "statement": "Je kan voorspellen welk teken of stuk je krijgt als je een string indexeert of slicet.",
+          "weight": 1
+        }
+      ],
+      "optional": false,
+      "order": 1000,
+      "parentId": "lijsten-tuples",
+      "teachingTips": [
+        "For `predict_index_error`: Probe the last-valid-index off-by-one: lean on `lijst[len(lijst)]` raising an IndexError.",
+        "For `write_slice`, `predict_string_index`: Tie slice bounds to `range(a, b)` from the loops goal: the end is excluded — probe the length of a slice like `lijst[1:3]`.",
+        "For `predict_index_value`: Watch for students who think a negative index is an error; in the feedback, contrast `lijst[-1]` with `lijst[len(lijst) - 1]` (not as a second pitfall in the question).",
+        "Present strings as sequences of characters with the same indexing and slicing; do not probe assigning to a string index or string methods here — immutability belongs to the tuples subgoal.",
+        "Python: goals 1 to 3 plus lists and strings with indexing (also negative), slicing and `len`. List methods and tuples come in later subgoals. Not seen yet: functions (`def`, `return`) — a list algorithm is a plain script, not a function —, `break`, `range` with a step, `enumerate`, `zip`, list comprehensions, dictionaries, sets, f-strings, string methods and `try`/`except`."
+      ],
+      "title": "Lijsten, strings en indexen",
+      "type": "goal"
+    },
+    {
+      "allowChains": false,
+      "contentId": null,
+      "description": "Je kan gegevens bewaren in lijsten en tuples: elementen opvragen en aanpassen via hun index of met slicing, lijsten en strings doorlopen met lussen, zelf klassieke lijstalgoritmes schrijven, het verschil tussen veranderbare lijsten en onveranderbare tuples benutten, en met geneste lussen werken op paren en rasters.",
+      "id": "lijsten-tuples",
+      "moduleId": "python-basics",
+      "objectives": [],
+      "optional": false,
+      "order": 4000,
+      "parentId": null,
+      "teachingTips": [],
+      "title": "Lijsten en tuples",
+      "type": "goal"
+    },
+    {
+      "allowChains": false,
+      "contentId": "lijstpatronen",
+      "description": "Je kan zelf veelgebruikte algoritmes over een lijst schrijven: het grootste of kleinste element zoeken zonder max() of min(), tellen wat aan een voorwaarde voldoet, zoeken of en waar een waarde voorkomt, en twee elementen van plaats wisselen.",
+      "id": "lijstpatronen",
+      "moduleId": "python-basics",
+      "objectives": [
+        {
+          "id": "write_find_max_manual",
+          "kind": "apply",
+          "optional": false,
+          "statement": "Je kan zonder max() of min() een lus schrijven die het grootste of kleinste element vindt.",
+          "weight": 1
+        },
+        {
+          "id": "predict_bad_initial_value",
+          "kind": "predict",
+          "optional": false,
+          "statement": "Je kan voorspellen wat er misloopt als de beginwaarde slecht gekozen is, zoals grootste = 0 bij enkel negatieve getallen.",
+          "weight": 1
+        },
+        {
+          "id": "write_count_matching",
+          "kind": "apply",
+          "optional": false,
+          "statement": "Je kan een lus schrijven die telt hoeveel elementen aan een voorwaarde voldoen.",
+          "weight": 1
+        },
+        {
+          "id": "write_search",
+          "kind": "apply",
+          "optional": false,
+          "statement": "Je kan een lus schrijven die zoekt naar een element dat aan een voorwaarde voldoet en onthoudt of en waar het gevonden werd.",
+          "weight": 1
+        },
+        {
+          "id": "write_swap_elements",
+          "kind": "apply",
+          "optional": false,
+          "statement": "Je kan twee elementen van een lijst wisselen met een hulpvariabele.",
+          "weight": 1
+        },
+        {
+          "id": "predict_swap_without_temp",
+          "kind": "predict",
+          "optional": false,
+          "statement": "Je kan voorspellen wat er misloopt als je twee elementen wisselt zonder hulpvariabele.",
+          "weight": 1
+        }
+      ],
+      "optional": false,
+      "order": 4000,
+      "parentId": "lijsten-tuples",
+      "teachingTips": [
+        "For `predict_bad_initial_value`: Probe the choice of initial value: starting from the first element is safer than 0 — lists with only negative numbers expose the bug.",
+        "For `write_search`: break has not been introduced: searches use a boolean flag or a while loop with an index; watch for 'niet gevonden' being printed inside the loop at every mismatch.",
+        "For `predict_swap_without_temp`: Probe the lost-value bug when swapping without a temporary variable.",
+        "For `write_find_max_manual`, `write_search`: Once the manual version works, contrast it with the built-ins max(), min() and in.",
+        "Python: goals 1 to 3 plus lists and strings with indexing (also negative), slicing and `len`, the list methods `append`, `insert`, `pop`, `remove` and `sort`, `in`, and `min`, `max` and `sum`, and `for` over a list, a string or `range(len(...))`. Not seen yet: functions (`def`, `return`) — a list algorithm is a plain script, not a function —, `break`, `range` with a step, `enumerate`, `zip`, list comprehensions, dictionaries, sets, f-strings, string methods and `try`/`except`."
+      ],
+      "title": "Klassieke lijstpatronen",
+      "type": "goal"
+    },
+    {
+      "allowChains": true,
+      "contentId": "lokale-variabelen",
+      "description": "Je kan voorspellen welke variabelen binnen en buiten een functie bestaan, wat er met een variabele van buitenaf gebeurt als de functie een variabele met dezelfde naam een waarde geeft, en uitleggen waarom een functie haar gegevens best via parameters krijgt en via return teruggeeft.",
+      "id": "lokale-variabelen",
+      "moduleId": "python-basics",
+      "objectives": [
+        {
+          "id": "predict_local_not_visible",
+          "kind": "predict",
+          "optional": false,
+          "statement": "Je kan voorspellen dat een parameter of een variabele die binnen een functie gemaakt wordt, buiten die functie niet bestaat en daar een NameError geeft.",
+          "weight": 1
+        },
+        {
+          "id": "predict_global_unchanged",
+          "kind": "predict",
+          "optional": false,
+          "statement": "Je kan voorspellen dat een toekenning binnen een functie een variabele met dezelfde naam buiten de functie ongemoeid laat.",
+          "weight": 1
+        },
+        {
+          "id": "predict_list_argument_mutation",
+          "kind": "predict",
+          "optional": false,
+          "statement": "Je kan voorspellen dat een functie die een lijst-argument aanpast met een methode of via een index, ook de lijst van de aanroeper verandert.",
+          "weight": 1
+        },
+        {
+          "id": "fix_function_returns_result",
+          "kind": "apply",
+          "optional": false,
+          "statement": "Je kan een functie die een variabele van buitenaf probeert aan te passen herschrijven zodat ze het resultaat teruggeeft en de aanroeper het opslaat.",
+          "weight": 1
+        },
+        {
+          "id": "reason_parameters_over_globals",
+          "kind": "reason",
+          "optional": false,
+          "statement": "Je kan uitleggen waarom een functie haar gegevens beter via parameters krijgt dan via variabelen van buitenaf.",
+          "weight": 1
+        }
+      ],
+      "optional": false,
+      "order": 4000,
+      "parentId": "functies",
+      "teachingTips": [
+        "Frame each call as getting its own fresh workspace: parameters and variables made inside exist only while the call runs, and are gone afterwards.",
+        "For `predict_global_unchanged`: Probe shadowing with the same name inside and outside (`x = 10`, then a function that does `x = 5`, then `print(x)`), and with a parameter that is reassigned (`def verhoog(getal): getal = getal + 1`).",
+        "For `fix_function_returns_result`: Lean on `teller = teller + 1` inside a function crashing with UnboundLocalError as the motivation for 'geef terug en sla op': `teller = verhoog(teller)`.",
+        "For `predict_list_argument_mutation`: Contrast with lists, tying back to aliasing from the tuples subgoal: `lijst.append(x)` or `lijst[0] = x` inside a function changes the caller's list, but `lijst = []` inside does not.",
+        "Do not introduce the `global` keyword; reading a variable from outside (like the turtle `t`) is fine, changing one goes through return. Functions return their result and contain no `print` — printing happens in the main script."
+      ],
+      "title": "Lokale variabelen",
+      "type": "goal"
+    },
+    {
+      "allowChains": true,
+      "contentId": "oppervlakte-schatten",
+      "description": "Je kan toevallige punten binnen een rechthoek maken, nagaan of een punt binnen een figuur ligt, en uit het aandeel treffers de oppervlakte van die figuur schatten, zoals een cirkel of het gebied onder een grafiek.",
+      "id": "oppervlakte-schatten",
+      "moduleId": "python-basics",
+      "objectives": [
+        {
+          "id": "write_random_point",
+          "kind": "apply",
+          "optional": false,
+          "statement": "Je kan een toevallig punt binnen een gegeven rechthoek maken met random.uniform voor elke coördinaat.",
+          "weight": 1
+        },
+        {
+          "id": "predict_point_is_hit",
+          "kind": "predict",
+          "optional": false,
+          "statement": "Je kan voor een gegeven punt voorspellen of een voorwaarde het als treffer binnen de figuur telt.",
+          "weight": 1
+        },
+        {
+          "id": "write_region_condition",
+          "kind": "apply",
+          "optional": false,
+          "statement": "Je kan een voorwaarde schrijven die nagaat of een punt binnen een figuur ligt, zoals een cirkel of het gebied onder de grafiek van een functie.",
+          "weight": 1
+        },
+        {
+          "id": "write_area_estimate",
+          "kind": "apply",
+          "optional": false,
+          "statement": "Je kan een oppervlakte schatten door het aandeel treffers te vermenigvuldigen met de oppervlakte van de rechthoek.",
+          "weight": 1
+        },
+        {
+          "id": "reason_share_is_area",
+          "kind": "reason",
+          "optional": false,
+          "statement": "Je kan uitleggen waarom het aandeel toevallige punten binnen een figuur haar oppervlakte benadert.",
+          "weight": 1
+        }
+      ],
+      "optional": false,
+      "order": 3000,
+      "parentId": "toeval-simulatie",
+      "teachingTips": [
+        "Frame it as throwing darts blindly at a rectangle that encloses the shape: the share of darts inside the shape is the share of the rectangle's area that the shape covers.",
+        "Always give the test for 'inside' in the question: for a circle with centre (0, 0) and radius r it is `x ** 2 + y ** 2 < r ** 2`; for the area under a graph it is `y < f(x)`, with f written as a function as in the functions goal.",
+        "For `write_area_estimate`: Probe the forgotten last step — the share of hits is not yet the area, it still has to be multiplied by the area of the rectangle — and a rectangle that does not enclose the whole shape.",
+        "Estimating pi with a quarter circle in the square from 0 to 1 (hits divided by total, times 4) is welcome as one context among others: the area under a parabola, an ellipse, a lake on a map described by a condition.",
+        "The output of these scripts is random, so never ask for 'the output': ask around which value an estimate lies, whether a given point counts as a hit, or give the random values that were drawn and ask what happens then. State every rule and formula in the question itself: the student must not need probability theory or know an area formula by heart.",
+        "From the random module use only `random.randint`, `random.random`, `random.choice` and `random.uniform`, which is introduced in this subgoal — no shuffle, sample, choices or seed. Everything else stays within the earlier goals: no numpy, matplotlib, f-strings, `break`, list comprehensions, dictionaries, sets or string methods. Functions return their result and contain no `print` or `input`; the main script prints."
+      ],
+      "title": "Een oppervlakte schatten met toevallige punten",
+      "type": "goal"
+    },
+    {
+      "allowChains": false,
+      "contentId": "parameters-argumenten",
+      "description": "Je kan een functie meerdere parameters geven, ze aanroepen met de juiste argumenten in de juiste volgorde, voorspellen welke waarde elke parameter krijgt, en een berekening die je meermaals nodig hebt veralgemenen tot een functie.",
+      "id": "parameters-argumenten",
+      "moduleId": "python-basics",
+      "objectives": [
+        {
+          "id": "predict_argument_binding",
+          "kind": "predict",
+          "optional": false,
+          "statement": "Je kan voorspellen welke waarde elke parameter krijgt bij een aanroep met meerdere argumenten en wat de functie daardoor teruggeeft.",
+          "weight": 1
+        },
+        {
+          "id": "write_function_with_params",
+          "kind": "apply",
+          "optional": false,
+          "statement": "Je kan een functie met meerdere parameters schrijven die een resultaat teruggeeft.",
+          "weight": 1
+        },
+        {
+          "id": "write_call_with_arguments",
+          "kind": "apply",
+          "optional": false,
+          "statement": "Je kan een gegeven functie aanroepen met waarden, variabelen of expressies als argument, in de juiste volgorde.",
+          "weight": 1
+        },
+        {
+          "id": "predict_arg_count_error",
+          "kind": "predict",
+          "optional": false,
+          "statement": "Je kan herkennen wanneer een aanroep een TypeError geeft omdat het aantal argumenten niet overeenkomt met het aantal parameters.",
+          "weight": 1
+        },
+        {
+          "id": "write_extract_function",
+          "kind": "apply",
+          "optional": false,
+          "statement": "Je kan een berekening die meerdere keren in een script voorkomt met andere waarden onderbrengen in een functie en de herhalingen vervangen door aanroepen.",
+          "weight": 1
+        },
+        {
+          "id": "predict_default_parameter",
+          "kind": "predict",
+          "optional": true,
+          "statement": "Je kan voorspellen welke waarde een parameter met een standaardwaarde krijgt als het argument weggelaten wordt.",
+          "weight": 1
+        }
+      ],
+      "optional": false,
+      "order": 2000,
+      "parentId": "functies",
+      "teachingTips": [
+        "For `predict_argument_binding`: Probe positional binding with a function where swapping the arguments changes the result (`verschil(a, b)`, `macht(grondtal, exponent)`), and with caller variables whose names differ from — or are deliberately swapped against — the parameter names.",
+        "For `write_function_with_params`: Watch for students who overwrite a parameter inside the body (`def btw(prijs): prijs = 100`) or ask for it with input(): the value comes from the call.",
+        "For `write_extract_function`: For the extraction LO, show a script in which the same formula appears two or three times with different numbers; the numbers that vary become the parameters.",
+        "Use a default value only when targeting that LO, and then a single trailing one (`def korting(prijs, procent=10)`).",
+        "Functions return their result and contain no `print` or `input`; no keyword arguments, `*args`, type hints, docstrings or f-strings."
+      ],
+      "title": "Parameters en argumenten",
+      "type": "goal"
+    },
+    {
+      "allowChains": true,
+      "contentId": "probleem-als-nulpunt",
+      "description": "Je kan een probleem uit de wetenschappen of de economie vertalen naar een vergelijking f(x) = 0, met een waardetabel of een grafiek een interval met een tekenwissel vinden, de vergelijking oplossen met een zoekmethode, en de oplossing controleren door ze in te vullen en op de grafiek te tonen.",
+      "id": "probleem-als-nulpunt",
+      "moduleId": "python-basics",
+      "objectives": [
+        {
+          "id": "decompose_equation_problem",
+          "kind": "reason",
+          "optional": false,
+          "statement": "Je kan voor een beschreven probleem aangeven wat de onbekende is, welke functie nul moet worden en tussen welke waarden je zoekt.",
+          "weight": 1
+        },
+        {
+          "id": "write_find_interval",
+          "kind": "apply",
+          "optional": false,
+          "statement": "Je kan met een lus over x-waarden een interval zoeken waarin een functie van teken wisselt.",
+          "weight": 1
+        },
+        {
+          "id": "write_solve_problem",
+          "kind": "apply",
+          "optional": false,
+          "statement": "Je kan een probleem oplossen door de bijbehorende functie te schrijven en een zoekmethode erop toe te passen.",
+          "weight": 1
+        },
+        {
+          "id": "write_plot_solution",
+          "kind": "apply",
+          "optional": false,
+          "statement": "Je kan de grafiek van de functie van een probleem tekenen met de gevonden oplossing erop gemarkeerd.",
+          "weight": 1
+        },
+        {
+          "id": "choose_solution_check",
+          "kind": "reason",
+          "optional": false,
+          "statement": "Je kan een gevonden oplossing controleren door ze in het oorspronkelijke probleem in te vullen en te beoordelen of ze zinvol is.",
+          "weight": 1
+        },
+        {
+          "id": "reason_which_zero_is_found",
+          "kind": "reason",
+          "optional": false,
+          "statement": "Je kan uitleggen waarom het startinterval of de startwaarde bepaalt welk nulpunt je vindt als een functie er meerdere heeft.",
+          "weight": 1
+        }
+      ],
+      "optional": false,
+      "order": 5000,
+      "parentId": "vergelijkingen-oplossen",
+      "teachingTips": [
+        "Elicit the plan before code, as in the earlier capstone subgoals: what is the unknown, which function is zero at the answer, between which two values does the answer certainly lie, and how is the answer checked.",
+        "For `write_find_interval`: Reuse the sign-change search in a value table from the functions goal: step through x values and return the first pair of neighbours where f changes sign; that pair is the start interval for bisection. A graph with `plt.plot` and `plt.grid()` may be used to look for it, but the grader cannot see it.",
+        "For `write_solve_problem`: Good problems have no formula from class: the yearly interest rate at which monthly deposits reach a target, the interest rate at which the payments of a project are worth exactly its cost (interne opbrengstvoet, with the formula given), the time at which a cooling model reaches a temperature, the launch angle for a given distance, the quantity at which a curved cost equals revenue.",
+        "For `choose_solution_check`: The check is to fill the found value into the original problem, not into the solver: compute the final capital at the found interest rate and compare it with the target within a tolerance; also judge whether the size and the sign make sense (an interest rate of 340 percent, a negative time).",
+        "For `write_plot_solution`: Draw the function of the problem with labelled axes and mark the found solution with `plt.scatter([oplossing], [0])`: a point that does not sit where the line crosses the axis shows at once that something is wrong.",
+        "For `reason_which_zero_is_found`: A function can have several zeros, and the start interval or start value decides which one a method returns; the problem decides which one is meaningful (the positive time, the price inside the market).",
+        "State every formula and every number in the question itself: the student translates and searches, they do not have to know a formula, a derivative rule or the exact solution. When a question asks to trace a method by hand, use at most two or three steps and numbers that stay easy (halves, quarters, small integers). The grader and the student's answer contain only code and text, never the picture: for a graph, ask for the code or for what is drawn where (which points, how many, at which x), never what it 'looks like'. Give the model of the situation as a formula or as a function that is already written.",
+        "Python: goals 1 to 7. A function passed as an argument is available; `bisectie(f, a, b, tolerantie)` may be given as ready-made code or asked for. The methods are written out with `while` and `if` on plain numbers — no scipy, and no numpy inside a search method. Drawing uses the commands of the graphs goal, in the main script: `plt.plot`, `plt.scatter`, `plt.grid()`, `plt.title`, `plt.xlabel`, `plt.ylabel`, `plt.legend()`, `label=`, `color=`, `plt.show()`, with the x values from a loop or from `np.linspace`. `math` (`math.sqrt`, `math.sin`, `math.cos`, `math.pi`), `abs` and `round` are fine. Not seen yet: f-strings, `break`, `range` with a step, `lambda`, recursion, `try`/`except`, list comprehensions, dictionaries, string methods. Functions return their result and contain no `print`, `input` or plotting commands; the main script prints and draws."
+      ],
+      "title": "Van probleem naar nulpunt",
+      "type": "goal"
+    },
+    {
+      "allowChains": true,
+      "contentId": "probleem-naar-programma",
+      "description": "Je kan een complexere probleemstelling opdelen in stappen en vertalen naar een werkend Python-programma dat condities, lussen en eventueel turtle combineert, en logische fouten daarin opsporen en verbeteren.",
+      "id": "probleem-naar-programma",
+      "moduleId": "python-basics",
+      "objectives": [
+        {
+          "id": "decompose_problem",
+          "kind": "reason",
+          "optional": false,
+          "statement": "Je kan een probleemstelling opdelen in stappen (invoer, verwerking, herhaling, uitvoer) voor je begint te programmeren.",
+          "weight": 1
+        },
+        {
+          "id": "write_program_from_problem",
+          "kind": "apply",
+          "optional": false,
+          "statement": "Je kan een complexere probleemstelling vertalen naar een werkend Python-programma met condities en lussen.",
+          "weight": 1
+        },
+        {
+          "id": "predict_program_behavior",
+          "kind": "predict",
+          "optional": false,
+          "statement": "Je kan van een programma met condities en lussen voorspellen wat het doet voor een concrete invoer.",
+          "weight": 1
+        },
+        {
+          "id": "fix_logic_error",
+          "kind": "apply",
+          "optional": false,
+          "statement": "Je kan een logische fout in een groter programma opsporen en verbeteren.",
+          "weight": 1
+        }
+      ],
+      "optional": false,
+      "order": 4000,
+      "parentId": "herhaling",
+      "teachingTips": [
+        "For `decompose_problem`: Elicit a plan in Dutch (stappen: invoer, verwerking, herhaling, uitvoer) before any code on larger tasks; probe decomposition separately from coding.",
+        "Combine building blocks from both goals — input with conversion, conditions, loops, turtle — but introduce no new mechanics (see the Python tip).",
+        "Turtle capstone exercises are welcome, e.g. a drawing whose colour, size or shape depends on user input, drawn with a loop.",
+        "For `fix_logic_error`: When the program is wrong, resist giving the fix — direct the student to choose a test case that exposes the bug, linking back to the testen-debuggen subgoal.",
+        "Python: only what goals 1 to 3 introduced — `print`, variables, arithmetic, `input` with `int`/`float`, `if`/`elif`/`else`, `and`/`or`/`not`, `for` with `range`, `while`, `+=`/`-=` and turtle. Not seen yet: functions (`def`, `return`), lists and tuples, indexing, `len`, string methods, `break`, `range` with a step, f-strings and `try`/`except`."
+      ],
+      "title": "Van probleem naar programma",
+      "type": "goal"
+    },
+    {
+      "allowChains": false,
+      "contentId": "rekenen-getallen",
+      "description": "Je kan rekenkundige expressies schrijven en evalueren met de standaardoperatoren (+, -, *, /, //, %, **), de volgorde van bewerkingen toepassen, en het verschil herkennen tussen int en float.",
+      "id": "rekenen-getallen",
+      "moduleId": "python-basics",
+      "objectives": [
+        {
+          "id": "write_arithmetic_expression",
+          "kind": "apply",
+          "optional": false,
+          "statement": "Je kan een rekenkundige expressie schrijven met +, -, *, /, //, %, en **.",
+          "weight": 1
+        },
+        {
+          "id": "predict_expression_value",
+          "kind": "predict",
+          "optional": false,
+          "statement": "Je kan voorspellen wat een rekenkundige expressie oplevert, inclusief de volgorde van bewerkingen.",
+          "weight": 1
+        },
+        {
+          "id": "predict_int_vs_float_result",
+          "kind": "predict",
+          "optional": false,
+          "statement": "Je kan voorspellen of het resultaat van een expressie een int of een float is.",
+          "weight": 1
+        },
+        {
+          "id": "predict_div_vs_floordiv",
+          "kind": "predict",
+          "optional": false,
+          "statement": "Je kan voorspellen wat het verschil is tussen / en // voor twee gegeven getallen.",
+          "weight": 1
+        },
+        {
+          "id": "recall_python_operators",
+          "kind": "recall",
+          "optional": false,
+          "statement": "Je kan de Python-operatoren voor de standaardbewerkingen benoemen, inclusief ** voor machtsverheffing.",
+          "weight": 1
+        }
+      ],
+      "optional": false,
+      "order": 3000,
+      "parentId": "eenvoudige-python-scripts",
+      "teachingTips": [
+        "For `write_arithmetic_expression`: Belgian students write decimals with a comma; `3,14 * 2` parses as `(3, 14) * 2` and yields a tuple, not multiplication. Surface this directly the first time float arithmetic is probed.",
+        "For `predict_int_vs_float_result`: Probe whether the student expects `8 / 2` to be `int` — Python 3's `/` always returns `float`, and this surprises novices who haven't been told.",
+        "For `predict_expression_value`: When testing precedence, prefer expressions where left-to-right and correct-precedence give different results (`2 + 3 * 4`); equal-result expressions don't probe the misconception.",
+        "For `recall_python_operators`: If the student writes `2^3` for 'two to the third', correct to `**` and note that `^` is bitwise XOR in Python — leave XOR for later.",
+        "Python: `print`, variables and the operators `+`, `-`, `*`, `/`, `//`, `%` and `**`, with parentheses. Not seen yet: `input`, comparisons, `if`, loops, `+=`, `round`, the `math` module, lists, functions (`def`, `return`) and f-strings."
+      ],
+      "title": "Rekenen met getallen",
+      "type": "goal"
+    },
+    {
+      "allowChains": false,
+      "contentId": "rekenen-numpy",
+      "description": "Je kan met np.linspace een reeks gelijk verdeelde x-waarden maken, met een formule in één keer rekenen op een hele array in plaats van met een lus, np.sin, np.cos en np.sqrt gebruiken, voorspellen waar een array zich anders gedraagt dan een lijst, en zo de grafiek van een functie in enkele regels tekenen.",
+      "id": "rekenen-numpy",
+      "moduleId": "python-basics",
+      "objectives": [
+        {
+          "id": "write_linspace",
+          "kind": "apply",
+          "optional": false,
+          "statement": "Je kan met np.linspace een array maken van een gegeven aantal gelijk verdeelde waarden tussen een begin en een einde.",
+          "weight": 1
+        },
+        {
+          "id": "predict_linspace_values",
+          "kind": "predict",
+          "optional": false,
+          "statement": "Je kan voorspellen welke waarden np.linspace(start, einde, aantal) oplevert, inclusief het begin, het einde en de stap ertussen.",
+          "weight": 1
+        },
+        {
+          "id": "write_array_formula",
+          "kind": "apply",
+          "optional": false,
+          "statement": "Je kan met één formule de functiewaarden voor een hele array x-waarden berekenen, zonder lus.",
+          "weight": 1
+        },
+        {
+          "id": "predict_list_vs_array",
+          "kind": "predict",
+          "optional": false,
+          "statement": "Je kan voorspellen wat bewerkingen zoals * 2 en + opleveren bij een array en hoe dat verschilt van een lijst.",
+          "weight": 1
+        },
+        {
+          "id": "write_numpy_math",
+          "kind": "apply",
+          "optional": false,
+          "statement": "Je kan np.sin, np.cos of np.sqrt gebruiken om een wiskundige functie op elke waarde van een array toe te passen.",
+          "weight": 1
+        },
+        {
+          "id": "write_function_plot_numpy",
+          "kind": "apply",
+          "optional": false,
+          "statement": "Je kan de grafiek van een functie tekenen met np.linspace en een formule op de hele array.",
+          "weight": 1
+        }
+      ],
+      "optional": false,
+      "order": 5000,
+      "parentId": "grafieken",
+      "teachingTips": [
+        "Present numpy as the short way to do what the student already built by hand: `np.linspace(start, einde, aantal)` is their own `x_waarden` function, and `y = x ** 2 - 4 * x + 3` on an array is their loop over the x values, done element by element. In feedback, tie an array formula back to the loop it replaces.",
+        "For `predict_linspace_values`: The third argument is the number of points, not the step, and both ends are included: `np.linspace(0, 5, 11)` gives 11 values with step 0.5, `np.linspace(0, 2, 5)` gives 0, 0.5, 1, 1.5 and 2. Probe the confusion with `range(0, 5)`, which excludes the end.",
+        "For `predict_list_vs_array`: A list and an array look alike when printed but calculate differently: `[1, 2, 3] * 2` repeats the list while the array gives 2, 4, 6; `+` glues two lists together but adds two arrays element by element; `lijst ** 2` is a TypeError. Use one of these per question.",
+        "For `write_numpy_math`: `math.sin(x)` on an array raises a TypeError ('only length-1 arrays can be converted to Python scalars'); the numpy versions `np.sin`, `np.cos` and `np.sqrt` work on every element. Angles stay in radians, with `np.pi`.",
+        "For `write_array_formula`: A function from the functions goal that only calculates (`def f(x): return x ** 2 - 4 * x + 3`) works unchanged when it is called with an array. Do not use functions with an `if` on x here: a condition on a whole array raises a ValueError, and that is out of scope.",
+        "The grader and the student's answer contain only code and text, never the picture. Never ask what the graph 'looks like' in general: ask how many points are drawn, which values an array holds, or what a described graph needs in code. State every formula in the question itself and alternate between mathematics (a quadratic, a sine), physics (a damped oscillation, distance against time, Celsius to Fahrenheit for a list of measurements) and economics (cost and revenue, growth of a capital).",
+        "Python: goals 1 to 6 plus `plt.plot`, `plt.scatter`, `plt.bar`, `plt.hist`, `plt.show`, `plt.title`, `plt.xlabel`, `plt.ylabel`, `plt.legend()`, `plt.grid()` and the named arguments `label=`, `color=` and `bins=`. New in this subgoal, after `import numpy as np`: `np.linspace`, `np.array(lijst)` to turn a list into an array, calculating with a whole array (`+`, `-`, `*`, `/`, `**` with a number or with an array of the same length), `np.sin`, `np.cos`, `np.sqrt`, `np.pi`, plus `len()` and indexing as with a list. No `np.arange`, `np.zeros`, `np.random`, `np.sum`/`np.mean`, boolean masks, two-dimensional arrays, `np.vectorize` or pandas; no `plt.subplots`, `fig`, `ax` or `savefig`. Not seen yet: f-strings, `break`, `range` with a step, list comprehensions, `lambda`, dictionaries, string methods, `zip`, `enumerate`. Functions return their result and contain no `print`, `input` or plotting commands; the main script draws."
+      ],
+      "title": "Sneller met numpy",
+      "type": "goal"
+    },
+    {
+      "allowChains": true,
+      "contentId": "return-waarden",
+      "description": "Je kan voorspellen wat er misloopt als een functie afdrukt in plaats van teruggeeft en dat herstellen, voorspellen dat een functie stopt bij de eerste return, functies schrijven die True of False teruggeven, en herkennen wanneer een functie iets doet, zoals tekenen, in plaats van iets te berekenen.",
+      "id": "return-waarden",
+      "moduleId": "python-basics",
+      "objectives": [
+        {
+          "id": "predict_print_vs_return",
+          "kind": "predict",
+          "optional": false,
+          "statement": "Je kan voorspellen dat het resultaat van een functie die afdrukt in plaats van teruggeeft None is.",
+          "weight": 1
+        },
+        {
+          "id": "fix_print_to_return",
+          "kind": "apply",
+          "optional": false,
+          "statement": "Je kan een functie die haar resultaat afdrukt herschrijven zodat ze het teruggeeft en de aanroeper het afdrukt.",
+          "weight": 1
+        },
+        {
+          "id": "reason_print_vs_return",
+          "kind": "reason",
+          "optional": false,
+          "statement": "Je kan uitleggen waarom een functie haar resultaat beter teruggeeft dan afdrukt.",
+          "weight": 1
+        },
+        {
+          "id": "predict_return_ends_function",
+          "kind": "predict",
+          "optional": false,
+          "statement": "Je kan voorspellen dat een functie stopt bij de eerste return die uitgevoerd wordt, ook midden in een if of een lus.",
+          "weight": 1
+        },
+        {
+          "id": "write_boolean_function",
+          "kind": "apply",
+          "optional": false,
+          "statement": "Je kan een functie schrijven die True of False teruggeeft, zodat je ze als voorwaarde in een if of while kan gebruiken.",
+          "weight": 1
+        },
+        {
+          "id": "write_turtle_function",
+          "kind": "apply",
+          "optional": true,
+          "statement": "Je kan een turtle-functie met parameters schrijven die iets tekent en niets teruggeeft, zoals een veelhoek waarvan je het aantal zijden en de lengte meegeeft.",
+          "weight": 1
+        }
+      ],
+      "optional": false,
+      "order": 3000,
+      "parentId": "functies",
+      "teachingTips": [
+        "For `predict_print_vs_return`: Students will meet functions that print in examples elsewhere: treat it as a bug to diagnose, not a style to practise. Lean on `resultaat = toon_dubbel(4)` followed by `print(resultaat)` showing None, and on `print(toon_dubbel(4))` showing the number and then None.",
+        "For `reason_print_vs_return`: For the reason LO, press on reuse: a returned value can be stored, compared, summed or passed on to another function; a printed one is gone.",
+        "For `predict_return_ends_function`: Probe early return: a `return` inside a for-loop ends the whole function at the first hit — contrast a correct search (`return True` inside the loop, `return False` after it) with the buggy if/else that already returns in the first iteration.",
+        "For `write_boolean_function`: For True/False functions, watch for `if is_even(x) == True` and for an if/else that returns the literals; show `return getal % 2 == 0` once the long version works.",
+        "A function that draws with turtle is the legitimate case of a function that does something instead of computing something: it returns nothing and its call stands alone on a line. Create `t` once at the top of the script, use it inside the function, and reuse the 360/n rule from the loops goal. Returning tuples, a bare `return`, recursion and f-strings are out of scope."
+      ],
+      "title": "Return onder de loep",
+      "type": "goal"
+    },
+    {
+      "allowChains": true,
+      "contentId": "situatie-simuleren",
+      "description": "Je kan een beschreven situatie met toeval vertalen naar een simulatie: bepalen wat één experiment is, dat experiment als functie schrijven, het vaak herhalen om een kans of een gemiddelde te schatten, en de simulatie controleren met een geval waarvan je het antwoord kent.",
+      "id": "situatie-simuleren",
+      "moduleId": "python-basics",
+      "objectives": [
+        {
+          "id": "decompose_simulation",
+          "kind": "reason",
+          "optional": false,
+          "statement": "Je kan voor een beschreven situatie aangeven wat één experiment is, wat je telt of meet, en hoe vaak je het herhaalt.",
+          "weight": 1
+        },
+        {
+          "id": "write_experiment_function",
+          "kind": "apply",
+          "optional": false,
+          "statement": "Je kan één experiment met meerdere toevallige stappen schrijven als functie die True of False of een getal teruggeeft.",
+          "weight": 1
+        },
+        {
+          "id": "predict_experiment_for_given_draws",
+          "kind": "predict",
+          "optional": false,
+          "statement": "Je kan van een experimentfunctie voorspellen wat ze teruggeeft als je weet welke toevalswaarden getrokken worden.",
+          "weight": 1
+        },
+        {
+          "id": "write_repeat_until_event",
+          "kind": "apply",
+          "optional": false,
+          "statement": "Je kan een experiment schrijven dat doorgaat tot een gebeurtenis zich voordoet en het aantal pogingen teruggeeft.",
+          "weight": 1
+        },
+        {
+          "id": "write_average_of_experiment",
+          "kind": "apply",
+          "optional": false,
+          "statement": "Je kan een gemiddelde schatten door een experiment dat een getal teruggeeft vele keren te herhalen.",
+          "weight": 1
+        },
+        {
+          "id": "choose_sanity_check",
+          "kind": "reason",
+          "optional": false,
+          "statement": "Je kan een simulatie controleren met een geval waarvan je het antwoord kent, zoals een kans van 0 of 1 of een eerlijke munt.",
+          "weight": 1
+        }
+      ],
+      "optional": false,
+      "order": 5000,
+      "parentId": "toeval-simulatie",
+      "teachingTips": [
+        "For `decompose_simulation`: Elicit the plan before code: what is one experiment, what does it return (True or False, or a number), what is counted or averaged, and how many repetitions — as in functies-combineren, one function for the experiment and one that repeats it.",
+        "Use situations whose answer is not obvious and describe them completely: shared birthdays in a group (365 equally likely days), the three-door game with a host who always opens an empty door, a batch with defective products, a queue, a dice game with a stake and a payout, atoms that each decay with a given chance per step. For averages ask for the average profit per round or the average number of attempts until success.",
+        "For drawing without replacement and for 'is there a duplicate', stay with lists: `random.choice` followed by `remove`, `in`, `append`, and an early `return` as in the functions goal.",
+        "For `choose_sanity_check`: For the check LO, push for a case with a known answer before a surprising result is trusted: set a chance to 0 or 1, take a group of 366 people, a game that cannot be lost, or a fair coin.",
+        "The output of these scripts is random, so never ask for 'the output': ask around which value an estimate lies, or give the random values that were drawn and ask what the experiment returns. State every rule of the game or situation in the question itself: the student must not need probability theory — no combinations, expected-value formulas or conditional probability — and the only chances taken as known are a fair coin (1 in 2) and a fair die (1 in 6).",
+        "From the random module use only `random.randint`, `random.random`, `random.choice` and `random.uniform` — no shuffle, sample, choices or seed. Everything else stays within the earlier goals: no numpy, matplotlib, f-strings, `break`, list comprehensions, dictionaries, sets or string methods. Functions return their result and contain no `print` or `input`; the main script prints."
+      ],
+      "title": "Van situatie naar simulatie",
+      "type": "goal"
+    },
+    {
+      "allowChains": true,
+      "contentId": "staafdiagram-histogram",
+      "description": "Je kan aantallen per categorie of per uitkomst tonen in een staafdiagram, de verdeling van een lijst waarden tonen in een histogram, voorspellen hoe hoog de staven worden, en de uitkomsten van een simulatie verzamelen en zichtbaar maken.",
+      "id": "staafdiagram-histogram",
+      "moduleId": "python-basics",
+      "objectives": [
+        {
+          "id": "write_bar_chart",
+          "kind": "apply",
+          "optional": false,
+          "statement": "Je kan met plt.bar een staafdiagram tekenen van aantallen per categorie of per uitkomst.",
+          "weight": 1
+        },
+        {
+          "id": "write_histogram",
+          "kind": "apply",
+          "optional": false,
+          "statement": "Je kan met plt.hist een histogram tekenen van een lijst waarden en het aantal klassen of de klassegrenzen kiezen met bins=.",
+          "weight": 1
+        },
+        {
+          "id": "predict_histogram_bars",
+          "kind": "predict",
+          "optional": false,
+          "statement": "Je kan voor een korte lijst waarden en gegeven klassegrenzen voorspellen hoe hoog elke staaf van het histogram wordt.",
+          "weight": 1
+        },
+        {
+          "id": "reason_bar_vs_histogram",
+          "kind": "reason",
+          "optional": false,
+          "statement": "Je kan uitleggen wanneer je een staafdiagram gebruikt en wanneer een histogram.",
+          "weight": 1
+        },
+        {
+          "id": "write_plot_simulation",
+          "kind": "apply",
+          "optional": false,
+          "statement": "Je kan de uitkomsten van een herhaald experiment in een lijst verzamelen en ze tonen in een passende grafiek.",
+          "weight": 1
+        }
+      ],
+      "optional": false,
+      "order": 4000,
+      "parentId": "grafieken",
+      "teachingTips": [
+        "For `write_bar_chart`: `plt.bar(namen, aantallen)` takes one list for the positions or names and one for the heights, of equal length. With the list of counters from the simulation goal, draw only the used positions: build the outcomes with a loop (`uitkomsten.append(som)`) next to the matching counts, or slice the counters (`tellingen[2:]`).",
+        "For `predict_histogram_bars`: Give a short list (at most 10 values) and the class limits as a list, `bins=[0, 10, 20, 30]`, and ask how high each bar is. Keep every value strictly between two limits, never on one.",
+        "For `reason_bar_vs_histogram`: A bar chart shows numbers that are already counted or measured per category (sales per month, how often each die value fell); a histogram gets the raw values and does the counting into classes itself (200 heights, 1000 end positions). Probe handing a list of counters to `plt.hist`, which then counts the counters.",
+        "For `write_plot_simulation`: Reuse the simulations of the previous goal with their rules stated in the question: the end positions of many random walks or the number of throws until a six in a histogram, how often each sum of two dice fell in a bar chart, the path of one walk as a line with `plt.plot(weg)`. The experiment stays a function that returns a value; the main script repeats it, collects the results in a list and draws.",
+        "The grader and the student's answer contain only code and text, never the picture. Never ask what the graph 'looks like' in general: ask how many bars are drawn, how high a given bar is, or what a described graph needs in code. For data that comes from `random`, never ask for exact heights: ask which bars can exist or which is expected to be the highest, with the rule of the experiment stated in the question. Alternate contexts between science (measurements, simulations) and economics (sales per month, incomes, prices).",
+        "Python: goals 1 to 6 plus `plt.plot`, `plt.scatter`, `plt.show`, `plt.title`, `plt.xlabel`, `plt.ylabel`, `plt.legend()`, `plt.grid()` and the named arguments `label=` and `color=`. New in this subgoal: `plt.bar(x, heights)` and `plt.hist(values, bins=...)` with `bins` a number of classes or a list of limits. No numpy, no pandas, no `plt.subplots`, `fig`, `ax`, `savefig`, `density=`, `plt.pie` or `plt.barh`. Counting uses a loop and a list of counters — no dictionaries, `count()` or `Counter`. Not seen yet: f-strings, `break`, `range` with a step, list comprehensions, string methods, `zip`, `enumerate`. Functions return their result and contain no `print`, `input` or plotting commands; the main script draws."
+      ],
+      "title": "Staafdiagram en histogram",
+      "type": "goal"
+    },
+    {
+      "allowChains": true,
+      "contentId": "stap-voor-stap-verbeteren",
+      "description": "Je kan een oplossing zoeken door een schatting herhaaldelijk te verbeteren: een vierkantswortel benaderen met de methode van Heron, de helling van een functie numeriek benaderen, een Newton-stap uitvoeren, stoppen wanneer twee opeenvolgende schattingen dicht genoeg bij elkaar liggen, en uitleggen wanneer zo'n methode sneller is dan bisectie en wanneer ze faalt.",
+      "id": "stap-voor-stap-verbeteren",
+      "moduleId": "python-basics",
+      "objectives": [
+        {
+          "id": "predict_heron_step",
+          "kind": "predict",
+          "optional": false,
+          "statement": "Je kan voorspellen welke schatting één stap van de methode van Heron oplevert voor een gegeven getal en startwaarde.",
+          "weight": 1
+        },
+        {
+          "id": "write_improve_until_stable",
+          "kind": "apply",
+          "optional": false,
+          "statement": "Je kan een lus schrijven die een schatting blijft verbeteren tot twee opeenvolgende schattingen minder dan een tolerantie verschillen.",
+          "weight": 1
+        },
+        {
+          "id": "write_numeric_slope",
+          "kind": "apply",
+          "optional": false,
+          "statement": "Je kan de helling van een functie in een punt numeriek benaderen met (f(x + h) - f(x)) / h.",
+          "weight": 1
+        },
+        {
+          "id": "write_newton_step",
+          "kind": "apply",
+          "optional": false,
+          "statement": "Je kan een Newton-stap schrijven die een schatting verbetert met x - f(x) / helling.",
+          "weight": 1
+        },
+        {
+          "id": "reason_newton_can_fail",
+          "kind": "reason",
+          "optional": false,
+          "statement": "Je kan uitleggen in welke situaties de methode van Newton faalt, zoals bij een helling van nul of een slechte startwaarde.",
+          "weight": 1
+        },
+        {
+          "id": "reason_bisection_vs_newton",
+          "kind": "reason",
+          "optional": false,
+          "statement": "Je kan uitleggen wanneer je bisectie verkiest en wanneer de methode van Newton.",
+          "weight": 1
+        }
+      ],
+      "optional": false,
+      "order": 4000,
+      "parentId": "vergelijkingen-oplossen",
+      "teachingTips": [
+        "For `predict_heron_step`: Heron for the square root of a: the new estimate is the average of x and a / x, `x = (x + a / x) / 2`. Trace one or two steps with easy numbers (a = 16 from x = 2 gives 5, then 4.1); if x is too small, a / x is too large, and the average lies in between.",
+        "For `write_improve_until_stable`: The loop keeps the previous estimate and stops when two successive estimates are close: `while abs(nieuw - oud) > tolerantie:`. Probe a loop that compares x with itself (and stops at once) and a start value that makes the first test false.",
+        "For `write_numeric_slope`: The slope of f at x is approximated with a small step h: `(f(x + h) - f(x)) / h`, for example h = 0.0001. Give this formula in the question; the student does not need derivative rules, though they may recognise the difference quotient from maths class.",
+        "For `write_newton_step`: One Newton step follows the tangent line down to the x-axis: `x = x - f(x) / helling(f, x)`. Give the formula; ask for one step as code, or for the whole loop with the stop rule of the Heron loop.",
+        "For `reason_newton_can_fail`: Newton needs a slope that is not zero and a start that is close enough: where the graph is flat the division explodes or the next estimate lands far away, and the method can jump to another zero. Bisection cannot fail once it has a sign change.",
+        "The successive estimates of a method can be collected in a list and drawn against the step number with `plt.plot(schattingen)`: a Newton or Heron line is flat after a few steps, a bisection line is still creeping closer. Show one method per question unless the target is `reason_bisection_vs_newton`.",
+        "For `reason_bisection_vs_newton`: Bisection gains a fixed factor 2 per step and is safe; Newton and Heron roughly double the number of correct digits per step but can fail. Let the student compare step counts they are given, not compute them.",
+        "State every formula and every number in the question itself: the student translates and searches, they do not have to know a formula, a derivative rule or the exact solution. When a question asks to trace a method by hand, use at most two or three steps and numbers that stay easy (halves, quarters, small integers). The grader and the student's answer contain only code and text, never the picture: for a graph, ask for the code or for what is drawn where (which points, how many, at which x), never what it 'looks like'. Use square roots and cube roots, x³ - x - 1 = 0, and one context per question from science or economics.",
+        "Python: goals 1 to 7. A function passed as an argument is available (`helling(f, x)`, `newton(f, start, tolerantie)`). The methods are written out with `while` and `if` on plain numbers — no scipy, and no numpy inside a search method. Drawing uses the commands of the graphs goal, in the main script: `plt.plot`, `plt.scatter`, `plt.grid()`, `plt.title`, `plt.xlabel`, `plt.ylabel`, `plt.legend()`, `label=`, `color=`, `plt.show()`, with the x values from a loop or from `np.linspace`. `math` (`math.sqrt`, `math.sin`, `math.cos`, `math.pi`), `abs` and `round` are fine. Not seen yet: f-strings, `break`, `range` with a step, `lambda`, recursion, `try`/`except`, list comprehensions, dictionaries, string methods. Functions return their result and contain no `print`, `input` or plotting commands; the main script prints and draws."
+      ],
+      "title": "Een schatting stap voor stap verbeteren",
+      "type": "goal"
+    },
+    {
+      "allowChains": false,
+      "contentId": "tekenen-turtle",
+      "description": "Je kan met de turtle-module een tekening programmeren: een turtle aanmaken, hem bewegen en draaien, de pen en kleur instellen, en condities gebruiken om te bepalen wat er getekend wordt.",
+      "id": "tekenen-turtle",
+      "moduleId": "python-basics",
+      "objectives": [
+        {
+          "id": "recall_turtle_commands",
+          "kind": "recall",
+          "optional": false,
+          "statement": "Je kan de turtle-basiscommando's benoemen om te bewegen, te draaien en de pen in te stellen.",
+          "weight": 1
+        },
+        {
+          "id": "predict_turtle_drawing",
+          "kind": "predict",
+          "optional": false,
+          "statement": "Je kan voorspellen welke figuur een gegeven turtle-script tekent.",
+          "weight": 1
+        },
+        {
+          "id": "write_turtle_figure",
+          "kind": "apply",
+          "optional": false,
+          "statement": "Je kan een turtle-script schrijven dat een eenvoudige figuur tekent, zoals een vierkant of driehoek.",
+          "weight": 1
+        },
+        {
+          "id": "write_turtle_with_condition",
+          "kind": "apply",
+          "optional": false,
+          "statement": "Je kan een turtle-script schrijven waarin een conditie bepaalt wat er getekend wordt, zoals de kleur of de vorm.",
+          "weight": 1
+        }
+      ],
+      "optional": false,
+      "order": 4000,
+      "parentId": "condities",
+      "teachingTips": [
+        "Use the object style consistently: `import turtle` then `t = turtle.Turtle()`, calling methods on `t`.",
+        "For `write_turtle_figure`: probe whether the student sets this up rather than calling bare functions.",
+        "For `predict_turtle_drawing`: Turns are relative to the turtle's current heading, not to screen directions — probe with a script that mixes left and right; students who track absolute compass directions mispredict.",
+        "For `write_turtle_figure`: Angles are in degrees; prefer 90-degree square figures for first probes, and use the triangle's 120-degree exterior turn as a harder probe of the turn-angle model.",
+        "Stay within t.forward, t.backward, t.left, t.right, t.penup, t.pendown and t.pencolor here — drawing with loops belongs in the next goal.",
+        "Every turtle script must end with `turtle.done()` — without it the window misbehaves; the window then stays open until the student closes it manually.",
+        "For `write_turtle_figure`: Treat a missing done() as a bug worth probing, not an afterthought.",
+        "Python: goals 1 and 2 plus `import turtle` and the turtle methods above. Not seen yet: loops (a square takes four separate pairs of lines here), `+=`, lists, functions (`def`, `return`), `random`, f-strings and string methods."
+      ],
+      "title": "Tekenen met turtle",
+      "type": "goal"
+    },
+    {
+      "allowChains": true,
+      "contentId": "testen-debuggen",
+      "description": "Je kan een programma systematisch testen door verschillende testgevallen uit te proberen, zinvolle testgevallen kiezen inclusief randgevallen, foutmeldingen interpreteren, en fouten opsporen en verbeteren.",
+      "id": "testen-debuggen",
+      "moduleId": "python-basics",
+      "objectives": [
+        {
+          "id": "choose_test_cases",
+          "kind": "reason",
+          "optional": false,
+          "statement": "Je kan zinvolle testgevallen kiezen voor een programma, inclusief randgevallen.",
+          "weight": 1
+        },
+        {
+          "id": "predict_testcase_output",
+          "kind": "predict",
+          "optional": false,
+          "statement": "Je kan voorspellen wat een programma doet voor een gegeven testgeval.",
+          "weight": 1
+        },
+        {
+          "id": "diagnose_from_error",
+          "kind": "reason",
+          "optional": false,
+          "statement": "Je kan uit een foutmelding afleiden waar en waarom een programma faalt.",
+          "weight": 1
+        },
+        {
+          "id": "fix_bug_via_testing",
+          "kind": "apply",
+          "optional": false,
+          "statement": "Je kan een fout in een programma opsporen en verbeteren door testgevallen uit te proberen.",
+          "weight": 1
+        }
+      ],
+      "optional": false,
+      "order": 3000,
+      "parentId": "herhaling",
+      "teachingTips": [
+        "For `choose_test_cases`: Probe whether the student tests only the happy path — push for 0, negative numbers and boundary values as test cases.",
+        "For `predict_testcase_output`: Have the student predict the output for a test case before running it; the mismatch between prediction and actual output is the teaching moment.",
+        "For `diagnose_from_error`: Distinguish syntax errors, runtime errors and logic errors — probe with one example of each on similar code.",
+        "Use programs with conditions and loops from earlier subgoals as debugging material. Python: only what goals 1 to 3 introduced — `print`, variables, arithmetic, `input` with `int`/`float`, `if`/`elif`/`else`, `and`/`or`/`not`, `for` with `range`, `while`, `+=`/`-=` and turtle. Not seen yet: functions (`def`, `return`), lists and tuples (so no list of test cases either), indexing, `len`, string methods, `break`, f-strings and `try`/`except`. A test case is a different input on a new run, or a different start value for a variable at the top of the program; to cover several test cases in one exercise, name the values in the question text or run the code inside a `for` loop over a `range`."
+      ],
+      "title": "Testen en debuggen",
+      "type": "goal"
+    },
+    {
+      "allowChains": false,
+      "contentId": null,
+      "description": "Je kan met de random-module toeval in een programma brengen en daarmee experimenten naspelen: toevallige waarden maken, een kans schatten door een experiment vaak te herhalen, een oppervlakte schatten met toevallige punten, een toevalswandeling programmeren, en een beschreven situatie vertalen naar een simulatie die je controleert met een geval waarvan je het antwoord kent.",
+      "id": "toeval-simulatie",
+      "moduleId": "python-basics",
+      "objectives": [],
+      "optional": false,
+      "order": 6000,
+      "parentId": null,
+      "teachingTips": [],
+      "title": "Toeval en simulatie",
+      "type": "goal"
+    },
+    {
+      "allowChains": false,
+      "contentId": "toevalsgetallen",
+      "description": "Je kan met de random-module toevallige waarden maken: een geheel getal tussen twee grenzen, een kommagetal tussen 0 en 1 of een willekeurig element uit een lijst, een gebeurtenis met een gegeven kans laten gebeuren, en voorspellen welke uitvoer van zo'n script mogelijk is.",
+      "id": "toevalsgetallen",
+      "moduleId": "python-basics",
+      "objectives": [
+        {
+          "id": "recall_random_ranges",
+          "kind": "recall",
+          "optional": false,
+          "statement": "Je kan aangeven welke waarden random.randint(a, b) en random.random() kunnen opleveren, inclusief de grenzen.",
+          "weight": 1
+        },
+        {
+          "id": "predict_possible_outputs",
+          "kind": "predict",
+          "optional": false,
+          "statement": "Je kan van een kort script met toevalsgetallen voorspellen welke uitvoer mogelijk is en welke niet.",
+          "weight": 1
+        },
+        {
+          "id": "write_random_value",
+          "kind": "apply",
+          "optional": false,
+          "statement": "Je kan met random.randint, random.random of random.choice een toevallige waarde maken die bij een beschrijving past, zoals een dobbelsteenworp of een willekeurige naam uit een lijst.",
+          "weight": 1
+        },
+        {
+          "id": "write_event_with_chance",
+          "kind": "apply",
+          "optional": false,
+          "statement": "Je kan een voorwaarde schrijven die met een gegeven kans waar is, zoals random.random() < 0.3 voor 30 procent.",
+          "weight": 1
+        },
+        {
+          "id": "predict_two_calls_differ",
+          "kind": "predict",
+          "optional": false,
+          "statement": "Je kan voorspellen wat er misloopt als een script twee keer een toevalsgetal opvraagt waar het twee keer dezelfde waarde nodig heeft.",
+          "weight": 1
+        },
+        {
+          "id": "write_random_function",
+          "kind": "apply",
+          "optional": false,
+          "statement": "Je kan een functie schrijven die bij elke aanroep een nieuwe toevallige waarde teruggeeft, zoals de som van twee dobbelstenen.",
+          "weight": 1
+        }
+      ],
+      "optional": false,
+      "order": 1000,
+      "parentId": "toeval-simulatie",
+      "teachingTips": [
+        "For `recall_random_ranges`: Probe the inclusive upper bound: `random.randint(1, 6)` can give 6, unlike `range(1, 6)`; `random.random()` can give 0.0 but never 1.0.",
+        "For `predict_two_calls_differ`: Lean on the roll-twice bug: `if random.randint(1, 6) == 6:` followed by `elif random.randint(1, 6) == 5:` rolls two different dice — the value has to be stored in a variable first.",
+        "For `write_event_with_chance`: For an event with a given chance use `random.random() < 0.3` or `random.randint(1, 100) <= 30`; probe the direction of the comparison (`> 0.3` happens 70 percent of the time).",
+        "For `write_random_function`: A function that uses random is the one exception to 'same arguments, same result' from the functions goal: probe that `worp()` gives a new value at every call, and that `worp() + worp()` is two throws while `2 * worp()` is one throw doubled.",
+        "The output of these scripts is random, so never ask for 'the output': ask which results are possible or impossible, how many values are printed, or give the random values that were drawn and ask what happens then. State every rule of the game or situation in the question itself: the student must not need probability theory, and the only chances taken as known are a fair coin (1 in 2) and a fair die (1 in 6).",
+        "From the random module use only `random.randint`, `random.random` and `random.choice` — no uniform, shuffle, sample, choices or seed. Everything else stays within the earlier goals: no numpy, f-strings, `break`, list comprehensions, dictionaries, sets or string methods. Functions return their result and contain no `print` or `input`; the main script prints."
+      ],
+      "title": "Toevalsgetallen maken",
+      "type": "goal"
+    },
+    {
+      "allowChains": true,
+      "contentId": "toevalswandeling",
+      "description": "Je kan een toevalswandeling programmeren waarbij een positie bij elke stap toevallig verandert, de afgelegde weg in een lijst bewaren, een wandeling laten stoppen bij een grens, en uitleggen wat vele herhaalde wandelingen tonen dat één wandeling niet toont.",
+      "id": "toevalswandeling",
+      "moduleId": "python-basics",
+      "objectives": [
+        {
+          "id": "predict_reachable_positions",
+          "kind": "predict",
+          "optional": false,
+          "statement": "Je kan voorspellen welke posities een toevalswandeling na een gegeven aantal stappen kan bereiken en welke niet.",
+          "weight": 1
+        },
+        {
+          "id": "write_random_walk",
+          "kind": "apply",
+          "optional": false,
+          "statement": "Je kan een functie schrijven die een toevalswandeling van een gegeven aantal stappen uitvoert en de eindpositie teruggeeft.",
+          "weight": 1
+        },
+        {
+          "id": "write_walk_history",
+          "kind": "apply",
+          "optional": false,
+          "statement": "Je kan alle posities van een toevalswandeling in een lijst bewaren en die lijst teruggeven.",
+          "weight": 1
+        },
+        {
+          "id": "write_walk_until_boundary",
+          "kind": "apply",
+          "optional": false,
+          "statement": "Je kan een toevalswandeling schrijven die stopt zodra een grens bereikt is, zoals een speler die blut is of zijn doel haalt.",
+          "weight": 1
+        },
+        {
+          "id": "reason_position_vs_distance",
+          "kind": "reason",
+          "optional": false,
+          "statement": "Je kan uitleggen waarom de gemiddelde eindpositie van vele eerlijke wandelingen rond nul ligt terwijl de gemiddelde afstand tot het startpunt groeit met het aantal stappen.",
+          "weight": 1
+        },
+        {
+          "id": "write_turtle_random_walk",
+          "kind": "apply",
+          "optional": true,
+          "statement": "Je kan met turtle een toevalswandeling tekenen waarbij de richting bij elke stap toevallig gekozen wordt.",
+          "weight": 1
+        }
+      ],
+      "optional": false,
+      "order": 4000,
+      "parentId": "toeval-simulatie",
+      "teachingTips": [
+        "Start with the walk on a line: a position that starts at 0 and goes one step up or down with `random.choice([-1, 1])`.",
+        "For `predict_reachable_positions`: Probe that after an odd number of steps the position is odd, so 0 is impossible, and that the farthest reachable position equals the number of steps.",
+        "For `write_walk_until_boundary`: For the boundary LO use a `while` with both limits in the condition (`while 0 < geld and geld < doel`) and return which limit was reached or how many steps it took; `break` has not been introduced.",
+        "For `reason_position_vs_distance`: For the reason LO, combine the walk with the repeat-and-average pattern from the earlier subgoals: steps up and down cancel out in the average end position, but the distance `abs(positie)` never cancels. The built-in `abs()` is introduced in this subgoal.",
+        "For `write_turtle_random_walk`: For turtle walks, turn to a random direction with `t.left(random.choice([0, 90, 180, 270]))` or `t.left(random.randint(0, 359))` and then go a fixed step forward; stay within the turtle commands from the earlier goals.",
+        "The output of these scripts is random, so never ask for 'the output': ask which positions are possible or impossible, or give the random steps that were drawn and ask where the walk ends. State the step rule in the question itself and vary the setting: a walker who has lost his way, a pollen grain pushed around by water molecules, a player who wins or loses 1 euro per round, a share price that rises or falls a little every day. The student must not need probability theory.",
+        "From the random module use only `random.randint`, `random.random`, `random.choice` and `random.uniform` — no shuffle, sample, choices or seed. Everything else stays within the earlier goals: no numpy, matplotlib, f-strings, `break`, list comprehensions, dictionaries, sets or string methods. Functions return their result and contain no `print` or `input`, apart from turtle drawing functions; the main script prints."
+      ],
+      "title": "Toevalswandelingen",
+      "type": "goal"
+    },
+    {
+      "allowChains": true,
+      "contentId": "tuples",
+      "description": "Je kan tuples aanmaken, indexeren en uitpakken (ook om te wisselen of om een lijst van paren te doorlopen), uitleggen waarom tuples en strings niet aan te passen zijn, en voorspellen wat er gebeurt als twee namen naar dezelfde lijst verwijzen.",
+      "id": "tuples",
+      "moduleId": "python-basics",
+      "objectives": [
+        {
+          "id": "predict_immutable_error",
+          "kind": "predict",
+          "optional": false,
+          "statement": "Je kan herkennen dat toewijzen aan een index van een tuple of string een fout geeft.",
+          "weight": 1
+        },
+        {
+          "id": "write_tuple_unpacking",
+          "kind": "apply",
+          "optional": false,
+          "statement": "Je kan een tuple uitpakken in afzonderlijke variabelen, ook om twee waarden te wisselen met a, b = b, a.",
+          "weight": 1
+        },
+        {
+          "id": "write_loop_over_pairs",
+          "kind": "apply",
+          "optional": false,
+          "statement": "Je kan een lijst van tuples doorlopen met for x, y in punten.",
+          "weight": 1
+        },
+        {
+          "id": "predict_list_aliasing",
+          "kind": "predict",
+          "optional": false,
+          "statement": "Je kan voorspellen dat na b = a een wijziging via b ook in a te zien is.",
+          "weight": 1
+        },
+        {
+          "id": "reason_tuple_vs_list",
+          "kind": "reason",
+          "optional": false,
+          "statement": "Je kan uitleggen wanneer een tuple beter past dan een lijst.",
+          "weight": 1
+        }
+      ],
+      "optional": false,
+      "order": 5000,
+      "parentId": "lijsten-tuples",
+      "teachingTips": [
+        "For `predict_immutable_error`: Connect immutability back to strings from the first subgoal: probe what `punt[0] = 5` and `woord[0] = 'K'` do.",
+        "For `predict_list_aliasing`: Probe aliasing with `b = a`, then `b.append(...)` and `print(a)`; show `a[:]` (slicing) as a real copy.",
+        "For `write_tuple_unpacking`: Watch for the belief that parentheses make a tuple: the comma does, and `(5)` is just an int.",
+        "For `reason_tuple_vs_list`: Frame tuple-vs-list as a fixed-shape record (coordinate, RGB colour) versus a collection that grows or shrinks.",
+        "Python: goals 1 to 3 plus lists and strings with indexing (also negative), slicing and `len`, the list methods `append`, `insert`, `pop`, `remove` and `sort`, `in`, and `min`, `max` and `sum`, and `for` over a list, a string or `range(len(...))`, plus tuples, unpacking and copying a list with `[:]`. Not seen yet: functions (`def`, `return`) — a list algorithm is a plain script, not a function —, `break`, `range` with a step, `enumerate`, `zip`, list comprehensions, dictionaries, sets, f-strings, string methods and `try`/`except`."
+      ],
+      "title": "Tuples en onveranderbaarheid",
+      "type": "goal"
+    },
+    {
+      "allowChains": false,
+      "contentId": "uitvoer-print",
+      "description": "Je kan met print() strings en getallen op het scherm tonen en herkent het verschil tussen wat in de broncode staat en wat als uitvoer verschijnt.",
+      "id": "uitvoer-print",
+      "moduleId": "python-basics",
+      "objectives": [
+        {
+          "id": "predict_print_output",
+          "kind": "predict",
+          "optional": false,
+          "statement": "Je kan voorspellen wat een print()-aanroep op het scherm toont.",
+          "weight": 1
+        },
+        {
+          "id": "write_print_value",
+          "kind": "apply",
+          "optional": false,
+          "statement": "Je kan een print()-aanroep schrijven die een gegeven waarde toont.",
+          "weight": 1
+        },
+        {
+          "id": "write_print_multi",
+          "kind": "apply",
+          "optional": false,
+          "statement": "Je kan een print()-aanroep schrijven die meerdere waarden tegelijk toont, gescheiden door komma's.",
+          "weight": 1
+        },
+        {
+          "id": "predict_comma_vs_plus",
+          "kind": "predict",
+          "optional": false,
+          "statement": "Je kan het verschil in uitvoer voorspellen tussen print met komma's en print met plustekens.",
+          "weight": 1
+        },
+        {
+          "id": "recall_quotes_for_strings",
+          "kind": "recall",
+          "optional": false,
+          "statement": "Je kan aangeven wanneer aanhalingstekens nodig zijn rond een waarde.",
+          "weight": 1
+        }
+      ],
+      "optional": false,
+      "order": 1000,
+      "parentId": "eenvoudige-python-scripts",
+      "teachingTips": [
+        "For `recall_quotes_for_strings`: Probe whether the student understands that quotes are what turn text into a string — without them, `print(hello)` makes Python look for something called `hello` and raise an error. Frame the contrast as 'met aanhalingstekens = tekst' vs. 'zonder aanhalingstekens = Python zoekt iets dat zo heet'. Do NOT use the word `variabele` or `variable name` — variables are not introduced until the next subgoal.",
+        "For `predict_comma_vs_plus`: When testing multi-argument print, contrast it directly with the `+` form on the same content; the comma-inserts-space behavior is the deliverable.",
+        "For `predict_print_output`: probe for whether the student conflates string concatenation with addition.",
+        "Stay within bare `print` calls in this subgoal — escape sequences, `end=`, `sep=`, and Python 2 `print` syntax belong later.",
+        "Python: only `print` with texts in quotes and numbers, separated by commas or joined with `+`. Not seen yet: variables, `input`, comparisons, `if`, loops, lists, functions (`def`, `return`), f-strings and string methods."
+      ],
+      "title": "Uitvoer met print",
+      "type": "goal"
+    },
+    {
+      "allowChains": false,
+      "contentId": "variabelen",
+      "description": "Je kan een waarde toekennen aan een variabele met =, een geldige naam kiezen, de variabele gebruiken in expressies en print, en haar waarde herwijzen.",
+      "id": "variabelen",
+      "moduleId": "python-basics",
+      "objectives": [
+        {
+          "id": "write_assignment",
+          "kind": "apply",
+          "optional": false,
+          "statement": "Je kan een waarde toekennen aan een variabele met =.",
+          "weight": 1
+        },
+        {
+          "id": "predict_variable_value",
+          "kind": "predict",
+          "optional": false,
+          "statement": "Je kan voorspellen welke waarde een variabele heeft na een reeks toekenningen, inclusief herwijzen.",
+          "weight": 1
+        },
+        {
+          "id": "write_use_variable",
+          "kind": "apply",
+          "optional": false,
+          "statement": "Je kan een variabele gebruiken in een print-aanroep of in een expressie.",
+          "weight": 1
+        },
+        {
+          "id": "recall_naming_rules",
+          "kind": "recall",
+          "optional": false,
+          "statement": "Je kan geldige variabelenamen herkennen volgens de regels van Python.",
+          "weight": 1
+        },
+        {
+          "id": "recall_string_vs_number",
+          "kind": "recall",
+          "optional": false,
+          "statement": "Je kan herkennen of een waarde tekst (string) of een getal is op basis van de aanhalingstekens.",
+          "weight": 1
+        }
+      ],
+      "optional": false,
+      "order": 2000,
+      "parentId": "eenvoudige-python-scripts",
+      "teachingTips": [
+        "For `write_assignment`: Treat `=` as 'put the right side into the name on the left' — if the student reads it as math-equals, surface directionality directly; they'll trip on `x = x + 1` otherwise.",
+        "For `predict_variable_value`: Belgian students write decimals with a comma; `pi = 3,14` silently becomes the tuple `(3, 14)`. Probe with a comma-form value at first exposure and explain the tuple outcome, not just 'wrong'.",
+        "For `predict_variable_value`: Probe right-to-left reading on self-reference like `x = x + 1` — a working mental model of assignment shows up here, not on bare first-time assignment.",
+        "For `recall_naming_rules`: When testing naming rules, mix valid and invalid candidates (`2name`, `for`, `my-var`, `Name`); case sensitivity is a separate failure mode from rule violations and warrants its own probe.",
+        "Python: `print`, texts and numbers, and variables with `=`, including `x = x + 1`. Not seen yet: `input`, comparisons, `if`, loops, `+=`, lists, functions (`def`, `return`), f-strings and string methods."
+      ],
+      "title": "Variabelen",
+      "type": "goal"
+    },
+    {
+      "allowChains": false,
+      "contentId": "vergelijkingen-booleans",
+      "description": "Je kan vergelijkingsoperatoren (==, !=, <, >, <=, >=) gebruiken om expressies te schrijven die True of False opleveren, dat resultaat opslaan in een variabele, en voorspellen wat een vergelijking oplevert.",
+      "id": "vergelijkingen-booleans",
+      "moduleId": "python-basics",
+      "objectives": [
+        {
+          "id": "recall_comparison_operators",
+          "kind": "recall",
+          "optional": false,
+          "statement": "Je kan de vergelijkingsoperatoren benoemen: ==, !=, <, >, <= en >=.",
+          "weight": 1
+        },
+        {
+          "id": "predict_comparison_result",
+          "kind": "predict",
+          "optional": false,
+          "statement": "Je kan voorspellen of een vergelijking True of False oplevert voor gegeven waarden.",
+          "weight": 1
+        },
+        {
+          "id": "write_comparison_from_dutch",
+          "kind": "apply",
+          "optional": false,
+          "statement": "Je kan een voorwaarde in natuurlijke taal omzetten naar een Python-vergelijking.",
+          "weight": 1
+        },
+        {
+          "id": "predict_bool_variable",
+          "kind": "predict",
+          "optional": false,
+          "statement": "Je kan voorspellen welke waarde een variabele heeft nadat het resultaat van een vergelijking eraan is toegekend.",
+          "weight": 1
+        },
+        {
+          "id": "reason_assign_vs_equals",
+          "kind": "reason",
+          "optional": false,
+          "statement": "Je kan uitleggen waarom = en == verschillende dingen doen.",
+          "weight": 1
+        }
+      ],
+      "optional": false,
+      "order": 1000,
+      "parentId": "condities",
+      "teachingTips": [
+        "For `reason_assign_vs_equals`: Probe the = vs == distinction before if is introduced: show `x = 5` and `x == 5` side by side and ask what each does — assignment stores, comparison asks.",
+        "For `predict_comparison_result`: Probe string-vs-number comparison via input: `input()` returns a string, so `'5' == 5` is False — tie this back to the conversion rule from the invoer-input subgoal.",
+        "For `predict_bool_variable`: Watch for lowercase `true`/`false`; contrast with Python's capitalized `True`/`False` and note there are exactly two boolean values.",
+        "Frame a comparison as an expression with a value, like `2 + 3` — it can be printed and stored in a variable, not only used later inside an if.",
+        "Do not only use = and ==. Very comparisons in exercises and don't skip !=",
+        "Do not include concepts like combining conditions (and, or) or if, elif. Students do not know those at this point.",
+        "Python: everything from goal 1 (`print`, variables, arithmetic, `input` with `int()`/`float()`) plus the comparison operators and `True`/`False`. Not seen yet: `if`, `and`/`or`/`not`, loops, `+=`, lists, functions (`def`, `return`), f-strings, string methods and `try`/`except`."
+      ],
+      "title": "Vergelijkingen en booleans",
+      "type": "goal"
+    },
+    {
+      "allowChains": false,
+      "contentId": null,
+      "description": "Je kan een vergelijking waarvoor geen formule bestaat numeriek oplossen: kommagetallen vergelijken met een tolerantie, een nulpunt insluiten en vinden met bisectie, een functie doorgeven als argument zodat één oplosfunctie voor elke vergelijking werkt, een schatting stap voor stap verbeteren met de methodes van Heron en Newton, de stappen van zo'n zoektocht zichtbaar maken met matplotlib, en een probleem uit de wetenschappen of de economie vertalen naar het zoeken van een nulpunt.",
+      "id": "vergelijkingen-oplossen",
+      "moduleId": "python-basics",
+      "objectives": [],
+      "optional": false,
+      "order": 8000,
+      "parentId": null,
+      "teachingTips": [],
+      "title": "Vergelijkingen oplossen door te zoeken",
+      "type": "goal"
+    },
+    {
+      "allowChains": true,
+      "contentId": "wiskundige-functies",
+      "description": "Je kan een voorschrift uit de wiskunde, fysica of economie vertalen naar een Python-functie, de math-module gebruiken, met een lus een waardetabel maken, en uit die functiewaarden iets afleiden over de functie, zoals waar ze het kleinst is of van teken wisselt.",
+      "id": "wiskundige-functies",
+      "moduleId": "python-basics",
+      "objectives": [
+        {
+          "id": "write_formula_function",
+          "kind": "apply",
+          "optional": false,
+          "statement": "Je kan een voorschrift of formule, zoals f(x) = x² - 4x + 3, vertalen naar een Python-functie met parameters en return.",
+          "weight": 1
+        },
+        {
+          "id": "write_math_module_call",
+          "kind": "apply",
+          "optional": false,
+          "statement": "Je kan na import math functies en constanten zoals math.sqrt en math.pi gebruiken in een berekening.",
+          "weight": 1
+        },
+        {
+          "id": "predict_table_x_values",
+          "kind": "predict",
+          "optional": false,
+          "statement": "Je kan voorspellen welke x-waarden een lus voor een waardetabel doorloopt, inclusief de eerste en de laatste.",
+          "weight": 1
+        },
+        {
+          "id": "write_value_table",
+          "kind": "apply",
+          "optional": false,
+          "statement": "Je kan een lus schrijven die een waardetabel van een functie toont of in een lijst bewaart, ook met een stap kleiner dan 1.",
+          "weight": 1
+        },
+        {
+          "id": "write_search_function_values",
+          "kind": "apply",
+          "optional": false,
+          "statement": "Je kan een lus schrijven die in een reeks functiewaarden een bijzonder punt zoekt, zoals de kleinste waarde of een tekenwissel.",
+          "weight": 1
+        },
+        {
+          "id": "reason_step_size",
+          "kind": "reason",
+          "optional": false,
+          "statement": "Je kan uitleggen waarom een waardetabel met een te grote stap een nulpunt of een extremum kan missen.",
+          "weight": 1
+        }
+      ],
+      "optional": false,
+      "order": 5000,
+      "parentId": "functies",
+      "teachingTips": [
+        "Take formulas from mathematics, physics and economics in turn — a quadratic, distance s = v*t + a*t**2/2, kinetic energy, compound interest K*(1 + r)**n, cost and revenue functions — and always state the formula in the question: the student translates it, they do not have to know it.",
+        "For `write_formula_function`: Watch for math notation leaking into code: `2x` for `2 * x`, `x^2` for `x ** 2`, and `f(x) = ...` instead of `def f(x):` with `return`.",
+        "For a step smaller than 1, compute x from the loop index (`x = start + i * stap`): `range` with a step argument or with floats has not been introduced. The function only computes and returns; the loop in the main script prints the rows or collects them in a list.",
+        "For `predict_table_x_values`: Probe how many rows the table has and whether the end value is included.",
+        "For `write_search_function_values`: Link the search questions to the list patterns goal: the smallest function value is the manual-minimum pattern, a sign change is a comparison of two neighbouring values.",
+        "For `reason_step_size`: For the step-size LO, use a function whose two zeros or whose minimum fall between two rows of a coarse table.",
+        "From math use only `math.sqrt` and `math.pi`, plus `math.sin`/`math.cos` (radians) when the formula needs them; `round(waarde, 2)` may tidy output but avoid values ending in exactly 5. No numpy, matplotlib, lambda or f-strings, and do not pass a function as an argument — the table loop calls the function by its name."
+      ],
+      "title": "Wiskundige functies en waardetabellen",
+      "type": "goal"
+    }
+  ],
+  "partitionKeyField": "type"
+}
