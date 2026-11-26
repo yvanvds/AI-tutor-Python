@@ -925,7 +925,7 @@ class TimetableDraftTest(_CommandTest):
         self.assertEqual((c["supervisedTurns"], c["homeTurns"]), (5, 1))
         # ×1.25 takes predict_b1 over the bar: the core goal counts.
         self.assertEqual(c["coreCounted"], 1)
-        self.assertIn("1.1.3-eval11", stdout)
+        self.assertIn("1.1.3-eval12", stdout)
         md = md_path.read_text(encoding="utf-8")
         self.assertIn("oefeningen deze periode: 5 onder toezicht, 1 thuis.", md)
         self.assertIn("weegt ×1,25, een oefening thuis ×1,0", md)
@@ -1241,7 +1241,7 @@ class Rules11Test(unittest.TestCase):
         return [self.answer(m, "correct" if c == "J" else "wrong", build) for m, c in enumerate(answers)]
 
     def test_the_rule_set_and_the_build_it_starts_from(self):
-        self.assertEqual(rules.RULES_VERSION, "1.1.3-eval11")
+        self.assertEqual(rules.RULES_VERSION, "1.1.3-eval12")
         self.assertEqual(rules.FORGET, 0.7)
         self.assertTrue(rules.rules_11({"clientVersion": "2.13.0+30"}))
         self.assertTrue(rules.rules_11({"clientVersion": "2.13.1+31"}))
@@ -1342,7 +1342,7 @@ class Rules279Test(unittest.TestCase):
     def test_the_constants(self):
         self.assertEqual(rules.MCQ_POSITIVE, 0.5)
         self.assertEqual((rules.STAMP_OWN_RIGHT_MIN, rules.STAMP_OWN_RIGHT_NON_MCQ_MIN), (2, 1))
-        self.assertEqual(rules.RULES_VERSION, "1.1.3-eval11")
+        self.assertEqual(rules.RULES_VERSION, "1.1.3-eval12")
 
     def test_a_pick_of_1_1_weighs_half_on_the_target_and_from_the_side(self):
         side = [_sig("sg-b", "predict_b1"), _sig("sg-b", "predict_b2")]
@@ -1430,7 +1430,7 @@ class MasteryGuard311Test(unittest.TestCase):
         return rules.replay(turns, GOALS, variant=rules.Variant(**variant))[key or self.KEY]
 
     def test_the_rule_set_and_the_build_it_starts_from(self):
-        self.assertEqual(rules.RULES_VERSION, "1.1.3-eval11")
+        self.assertEqual(rules.RULES_VERSION, "1.1.3-eval12")
         self.assertTrue(rules.mastery_guard({"clientVersion": "2.15.0+32"}))
         self.assertFalse(rules.mastery_guard({"clientVersion": "2.14.0+31"}))
         self.assertFalse(rules.mastery_guard({}))
@@ -1529,7 +1529,7 @@ class FollowUp326Test(unittest.TestCase):
         return rules.replay(turns, GOALS, variant=rules.Variant(**variant))[self.KEY]
 
     def test_the_rule_set_and_the_build_it_starts_from(self):
-        self.assertEqual(rules.RULES_VERSION, "1.1.3-eval11")
+        self.assertEqual(rules.RULES_VERSION, "1.1.3-eval12")
         self.assertTrue(rules.follow_up_counts({"clientVersion": "2.16.0+33"}))
         self.assertTrue(rules.follow_up_counts({"clientVersion": "2.17.1+40"}))
         self.assertFalse(rules.follow_up_counts({"clientVersion": "2.15.0+32"}))
@@ -2974,7 +2974,7 @@ class DocStamp327Test(unittest.TestCase):
         return rules.replay(turns, GOALS, variant=rules.Variant(**variant), stamps=stamps)[_LIEN_KEY]
 
     def test_the_rule_set(self):
-        self.assertEqual(rules.RULES_VERSION, "1.1.3-eval11")
+        self.assertEqual(rules.RULES_VERSION, "1.1.3-eval12")
 
     def test_a_doc_stamp_the_replay_does_not_give_guards_as_in_the_app(self):
         turns = _lien_turns()
@@ -3235,6 +3235,448 @@ class DocClock328CommandTest(_CommandTest):
         self.log(turns, _the_app_writes(rewritten, _KEES_NOVEMBER))
         self.assertIsNone(rules.replay(turns, GOALS, variant=rules.Variant(as_11=True))[_KEES_KEY].first_mastered_at)
         self.nothing_to_show()
+
+
+# #342: oefeningen the teacher marked as not counting — answers pasted from a
+# chatbot. The marking is the field `excluded` on the `turn_history` doc.
+_MARK = {"reason": "chatbot", "signs": ["vet", "snel"], "decidedAt": "2026-11-25"}
+_PASTED = {"reason": "geplakt", "signs": ["snel"], "decidedAt": "2026-11-25"}
+_BUILD_16 = {"clientVersion": "2.16.0+33", "questionType": "completeCodeQuestion"}
+
+
+def _marked_turn(uid: str, minute: int, subgoal: str, lo: str, quality: str = "correct", signal: str = "positive",
+                 strength: str = "strong", mark: dict | None = None, **extra) -> dict:
+    """An oefening on 2026-11-23 on build 2.16.0 (formula 1.1.3), an open
+    question at home, with the etag Cosmos hands out; [mark] marks it."""
+    t = _turn(f"2026-11-23T09:{minute:02d}:00.000Z", subgoal, lo, uid=uid, overallQuality=quality,
+              loSignals=[_sig(subgoal, lo, strength, signal)], **_BUILD_16)
+    t["_etag"] = f'"etag-{uid}-{t["id"]}"'
+    if mark is not None:
+        t["excluded"] = mark
+    t.update(extra)
+    return t
+
+
+class Exclusion342Test(unittest.TestCase):
+    """#342, rule set `1.1.3-eval12`: a marked oefening stays in the log and
+    gives nothing — no μ, no stamp, no highest level, no own question, no
+    transfer credit — and a follow-up on it does not count it as right
+    (#326). A follow-up that is not marked counts, as a follow-up."""
+
+    KEY = ("sg-b", "predict_b1")
+
+    def answer(self, minute: int, quality: str = "correct", mark: dict | None = None, **extra) -> dict:
+        signal = "negative" if quality == "wrong" else "positive"
+        strength = "moderate" if quality == "partial" else "strong"
+        return _marked_turn("u-x", minute, "sg-b", "predict_b1", quality, signal, strength, mark, **extra)
+
+    def follow_up(self, minute: int, quality: str = "correct", depth: int = 1, mark: dict | None = None) -> dict:
+        return self.answer(minute, quality, mark, isFollowUp=True, chainDepth=depth)
+
+    def lo(self, turns: list[dict], **kw) -> rules.LoState | None:
+        return rules.replay(turns, GOALS, **kw).get(self.KEY)
+
+    def test_the_rule_set_and_the_field(self):
+        self.assertEqual(rules.RULES_VERSION, "1.1.3-eval12")
+        self.assertTrue(rules.is_excluded({"excluded": _MARK}))
+        for t in ({}, {"excluded": None}, {"excluded": {}}, {"excluded": False}):
+            self.assertFalse(rules.is_excluded(t))
+
+    def test_a_marked_oefening_gives_nothing(self):
+        # Two right answers, the second at hard in the lesson: it stamps.
+        lesson = {"difficulty": "hard", "provenance": "supervised"}
+        own = [self.answer(0), self.answer(5, **lesson)]
+        self.assertIsNotNone(self.lo(own).first_mastered_at)
+        marked = [own[0], self.answer(5, mark=_MARK, **lesson)]
+        # As if it were not there: no weight, no stamp, no level, no own
+        # question, no clock.
+        self.assertEqual(self.lo(marked), self.lo(own[:1]))
+        self.assertEqual((self.lo(marked).ratchet, self.lo(marked).own_questions), ("medium", 1))
+        # Read as the app read it, it is the oefening it was, and the state
+        # says where the marking starts.
+        app = self.lo(marked, skip_excluded=False)
+        at = rules.parse_at(marked[1]["turnAt"])
+        self.assertEqual((app.first_mastered_at, app.first_excluded_at), (at, at))
+        self.assertEqual(dataclasses.replace(app, first_excluded_at=None), self.lo(own))
+
+    def test_nor_does_its_negative_or_its_transfer_credit(self):
+        credit = [{"subgoalId": "sg-a", "loId": "recall_a1", "alphaDelta": 0.5}]
+        turns = [self.answer(0), self.answer(5, "wrong", _MARK, transferCredits=credit)]
+        st = rules.replay(turns, GOALS)
+        self.assertEqual(st[self.KEY], self.lo(turns[:1]))
+        self.assertNotIn(("sg-a", "recall_a1"), st)
+        app = rules.replay(turns, GOALS, skip_excluded=False)
+        self.assertEqual(app[("sg-a", "recall_a1")].n_transfer, 1)
+        self.assertGreater(app[self.KEY].beta, 1.0)
+
+    def test_a_marked_own_question_is_none_and_its_follow_up_does_not_finish_it(self):
+        turns = [self.answer(0, "partial", _MARK), self.follow_up(1)]
+        lo = self.lo(turns)
+        self.assertEqual((lo.own_questions, lo.own_right, lo.own_right_open), (0, 0, 0))
+        # The follow-up is the student's own answer: it counts, as a
+        # follow-up — weak, at medium (§6.2) — and moves no level.
+        self.assertEqual(lo.n_follow_up_pos, 1)
+        self.assertAlmostEqual(lo.alpha, 1 + rules.WEIGHT["weak"], places=9)
+        self.assertIsNone(lo.ratchet)
+        # As the app read it, the follow-up finished the partial own
+        # question (#326).
+        app = self.lo(turns, skip_excluded=False)
+        self.assertEqual((app.own_questions, app.own_right, app.own_right_open), (1, 1, 1))
+
+    def test_a_marked_own_question_ends_the_chain_before_it(self):
+        # The follow-up is on the marked question, not on the partial one.
+        turns = [self.answer(0, "partial"), self.answer(1, "partial", _MARK), self.follow_up(2)]
+        lo = self.lo(turns)
+        self.assertEqual((lo.own_questions, lo.own_right), (1, 0))
+
+    def test_a_marked_follow_up_finishes_nothing_an_own_one_after_it_does(self):
+        partial = self.answer(0, "partial")
+        lo = self.lo([partial, self.follow_up(1, mark=_MARK)])
+        self.assertEqual((lo.own_right, lo.n_follow_up_pos), (0, 0))
+        lo = self.lo([partial, self.follow_up(1, mark=_MARK), self.follow_up(2, depth=2)])
+        self.assertEqual((lo.own_right, lo.own_right_open, lo.n_follow_up_pos), (1, 1, 1))
+
+    def test_a_marking_that_moves_only_the_clock_makes_no_difference(self):
+        neutral = self.follow_up(1, "partial", mark=_MARK)
+        neutral["loSignals"] = [_sig("sg-b", "predict_b1", "weak", "neutral")]
+        turns = [self.answer(0), neutral]
+        app, without = self.lo(turns, skip_excluded=False), self.lo(turns)
+        self.assertNotEqual(app.last_at, without.last_at)
+        self.assertFalse(evaluate.marking_differs(app, without))
+        # A marked own question does: it is no own question any more.
+        own = [self.answer(0), self.answer(1, "partial", _MARK, loSignals=[_sig("sg-b", "predict_b1", "weak", "neutral")])]
+        self.assertTrue(evaluate.marking_differs(self.lo(own, skip_excluded=False), self.lo(own)))
+
+
+# #342: a class of one made-up student, on build 2.16.0. On 2026-11-23 she
+# answers recall_a1, write_a2, fix_a3 and predict_b1 right at medium, the
+# last with a follow-up, neutral, that the teacher later marks (pasted). Then
+# recall_a1, write_a2 and fix_a3 right at hard, three answers marked too (a
+# chatbot): each stamps its LO, at hard. Then fix_a3 right at hard again,
+# her own: without the marked ones that is where fix_a3 stamps. Her docs are
+# what the app wrote, which knows no marking. Two stamps the replay does not
+# give: write_a2 got its stamp at 09:01 (an older rewrite), predict_b1 on
+# 11-09.
+KLAS_MARKEER = "6MARKEER"
+ACCOUNTS += [
+    {"uid": "u-mila", "firstName": "Mila", "lastName": "Markeer", "className": KLAS_MARKEER,
+     "updatedAt": "2026-11-23T09:20:05Z", "calibration": {"difficulty": "hard"}},
+]
+_MILA_NOW = dt.datetime(2026, 11, 26, 18, 0, tzinfo=dt.timezone.utc)
+_HARD_ANSWER = {"difficulty": "hard"}  # asked at medium's calibration: a positive at calibration
+_RECALL, _WRITE, _FIX, _PREDICT = ("sg-a", "recall_a1"), ("sg-a", "write_a2"), ("sg-a", "fix_a3"), ("sg-b", "predict_b1")
+_mila = lambda minute, key, *a, **k: _marked_turn("u-mila", minute, key[0], key[1], *a, **k)  # noqa: E731
+TURNS["u-mila"] = [
+    _mila(0, _RECALL), _mila(1, _WRITE), _mila(2, _FIX), _mila(3, _PREDICT),
+    _mila(4, _PREDICT, "partial", "neutral", "weak", mark=_PASTED, isFollowUp=True, chainDepth=1),
+    _mila(10, _RECALL, mark=_MARK, **_HARD_ANSWER),
+    _mila(11, _WRITE, mark=_MARK, **_HARD_ANSWER),
+    _mila(12, _FIX, mark=_MARK, **_HARD_ANSWER),
+    _mila(20, _FIX, **_HARD_ANSWER),
+]
+
+
+def _mila_as_the_app_wrote() -> dict[tuple[str, str], dict]:
+    docs = {}
+    for key, s in rules.replay(TURNS["u-mila"], GOALS, skip_excluded=False).items():
+        doc = _as_the_app_wrote("u-mila", key, s)
+        doc.update(ownQuestions=s.own_questions, ownQuestionsRight=s.own_right, ownQuestionsRightNonMcq=s.own_right_open)
+        docs[key] = doc
+    docs[_WRITE]["firstMasteredAt"] = "2026-11-23T09:01:01.000Z"
+    docs[_PREDICT]["firstMasteredAt"] = "2026-11-09T21:00:00.000Z"
+    return docs
+
+
+MILA_STORED = _mila_as_the_app_wrote()
+
+
+class _MilaTest(_CommandTest):
+    def setUp(self):
+        super().setUp()
+        patch = mock.patch.object(evaluate, "_now", lambda: _MILA_NOW)
+        patch.start()
+        self.addCleanup(patch.stop)
+        self.stored = {k: dict(v) for k, v in MILA_STORED.items()}
+        self.cosmos.beliefs = lambda uid: {k: dict(v) for k, v in self.stored.items()} if uid == "u-mila" else {}
+
+    def row(self, stdout: str, columns: int) -> list[str]:
+        line = next(line for line in stdout.splitlines() if line.startswith("Mila Markeer"))
+        return line.split()[-columns:]
+
+    def written(self) -> dict[str, dict]:
+        return {doc["loId"]: doc for coll, doc, _, _ in self.cosmos.upserts if coll == "lo_beliefs"}
+
+    def backups(self) -> list[Path]:
+        return sorted((self.tmp / "backups").glob("*.json"))
+
+
+class ReplayBeliefsExcluded342Test(_MilaTest):
+    """`replay-beliefs --uitgesloten` (#342) against the fake Cosmos: it
+    replays with and without the marked oefeningen and lowers, on an LO where
+    the two differ, only what the marked ones gave."""
+
+    def without(self) -> dict:
+        return rules.replay(TURNS["u-mila"], GOALS, stamps=evaluate.doc_stamps(MILA_STORED))
+
+    def test_a_dry_run_counts_and_writes_nothing(self):
+        stdout = self.run_cli("replay-beliefs", "--klas", KLAS_MARKEER, "--uitgesloten")
+
+        # docs · marked · differ · to write · stamp gone · later · level lower · α/β · calibration · counts · build
+        self.assertEqual(self.row(stdout, 11), ["4", "4", "3", "3", "1", "1", "2", "3", "2", "3", "2.16.0+33"])
+        self.assertIn("te schrijven: 3 documenten bij 1 leerling(en) — stempel weg 1, stempel later 1", stdout)
+        self.assertIn("Een leerdoel zonder verschil blijft onaangeroerd.", stdout)
+        self.assertIn("weer open (#325)", stdout)
+        self.assertIn("Droge run: er is niets geschreven", stdout)
+        self.assertEqual((self.cosmos.upserts, self.backups()), ([], []))
+
+    def test_without_the_flag_nothing_is_lowered(self):
+        # The plain rewrite is one-way (#168): it keeps every stamp, level
+        # and count, and only writes α and β of the replay without.
+        stdout = self.run_cli("replay-beliefs", "--klas", KLAS_MARKEER)
+        self.assertEqual(self.row(stdout, 13)[:9], ["4", "4", "3", "0", "0", "0", "3", "0", "0"])
+
+    def test_apply_lowers_only_what_the_marked_oefeningen_gave(self):
+        backed_up_before = []
+        upsert = self.cosmos.upsert
+
+        def watched(coll, doc, pk, etag=None):
+            backed_up_before.append(bool(self.backups()))
+            return upsert(coll, doc, pk, etag)
+
+        self.cosmos.upsert = watched
+        stdout = self.run_cli("replay-beliefs", "--klas", KLAS_MARKEER, "--uitgesloten", "--apply")
+
+        self.assertEqual(backed_up_before, [True, True, True])
+        self.assertIn("replay-beliefs-uitgesloten", self.backups()[0].name)
+        self.assertEqual(len(json.loads(self.backups()[0].read_text(encoding="utf-8"))["lo_beliefs"]), 4)
+        written = self.written()
+        # predict_b1: a marked follow-up moved its clock and nothing else,
+        # so its stamp of 11-09, which the replay does not give, is not
+        # touched.
+        self.assertEqual(sorted(written), ["fix_a3", "recall_a1", "write_a2"])
+        lowered = {"alpha", "beta", "lastUpdatedAt", "firstMasteredAt", "lastPositiveAtCalibratedAt",
+                   "highestPositiveDifficulty", "ownQuestions", "ownQuestionsRight", "ownQuestionsRightNonMcq"}
+        for coll, doc, pk, etag in self.cosmos.upserts:
+            before = MILA_STORED[(doc["subgoalId"], doc["loId"])]
+            self.assertEqual((coll, pk, etag), ("lo_beliefs", "u-mila", before["_etag"]))
+            self.assertLessEqual({k for k in set(doc) | set(before) if doc.get(k) != before.get(k)}, lowered)
+        without = self.without()
+        counts = lambda d: (d["ownQuestions"], d["ownQuestionsRight"], d["ownQuestionsRightNonMcq"])  # noqa: E731
+
+        # recall_a1: the stamp fell on the marked oefening — gone, and the
+        # doc does not read as mastered any more; level, positive at
+        # calibration and counts back to her own answer.
+        recall = written["recall_a1"]
+        self.assertNotIn("firstMasteredAt", recall)
+        self.assertIsNone(evaluate.app_stamp(recall))
+        self.assertEqual(recall["highestPositiveDifficulty"], "medium")
+        self.assertEqual(recall["lastPositiveAtCalibratedAt"], "2026-11-23T09:00:00.000Z")
+        self.assertEqual(counts(recall), (1, 1, 1))
+        self.assertEqual(counts(MILA_STORED[_RECALL]), (2, 2, 2))
+        self.assertEqual((recall["alpha"], recall["beta"]),
+                         rules.decayed(without[_RECALL], rules.parse_at(recall["lastUpdatedAt"])))
+        self.assertEqual(recall["lastUpdatedAt"], MILA_STORED[_RECALL]["lastUpdatedAt"])
+        # write_a2: the doc's stamp is from before the first marked
+        # oefening: it stays. The rest is lowered as on recall_a1.
+        write = written["write_a2"]
+        self.assertEqual(write["firstMasteredAt"], "2026-11-23T09:01:01.000Z")
+        self.assertEqual((write["highestPositiveDifficulty"], counts(write)), ("medium", (1, 1, 1)))
+        # fix_a3: without the marked oefening it stamps on her own answer at
+        # 09:20: later. That one was at hard, so the level stays.
+        fix = written["fix_a3"]
+        self.assertEqual(fix["firstMasteredAt"], "2026-11-23T09:20:00.000Z")
+        self.assertEqual(MILA_STORED[_FIX]["firstMasteredAt"], "2026-11-23T09:12:01.000Z")
+        self.assertEqual(fix["highestPositiveDifficulty"], "hard")
+        self.assertEqual(fix["lastPositiveAtCalibratedAt"], MILA_STORED[_FIX]["lastPositiveAtCalibratedAt"])
+        self.assertEqual((counts(fix), counts(MILA_STORED[_FIX])), ((2, 2, 2), (3, 3, 3)))
+        self.assertIn("geschreven 3, conflicten 0", stdout)
+        self.assertIn(f"Controleer met: evaluate.py validate --klas {KLAS_MARKEER}\n", stdout)
+
+    def test_validate_reads_the_lowered_docs_as_the_replay_and_a_second_run_has_nothing(self):
+        before = self.run_cli("validate", "--klas", KLAS_MARKEER)
+        self.assertEqual(self.row(before, 5), ["4", "4", "3", "2", "2.16.0+33"])
+        self.assertIn("Oefeningen die niet meetellen (markeer, #342), overgeslagen in de herspeling: Mila Markeer (4).", before)
+        self.assertIn(f"replay-beliefs --klas {KLAS_MARKEER} --uitgesloten", before)
+
+        self.run_cli("replay-beliefs", "--klas", KLAS_MARKEER, "--uitgesloten", "--apply")
+        self.stored.update({(d["subgoalId"], d["loId"]): d for d in self.written().values()})
+        self.cosmos.upserts.clear()
+
+        self.assertEqual(self.row(self.run_cli("validate", "--klas", KLAS_MARKEER), 5), ["4", "4", "0", "0", "2.16.0+33"])
+        again = self.run_cli("replay-beliefs", "--klas", KLAS_MARKEER, "--uitgesloten")
+        self.assertIn("te schrijven: 0 documenten", again)
+        self.assertEqual(self.row(again, 11)[:4], ["4", "4", "3", "0"])
+
+    def test_it_refuses_in_the_lesson_time_of_the_class(self):
+        # 18:00 UTC on Thursday is 19:00 in Belgium.
+        self.cosmos.classes = lambda: {
+            "classes": [{"name": KLAS_MARKEER, "lessons": [{"weekday": 4, "start": "18:55", "end": "20:00"}]}]
+        }
+        with self.assertRaises(SystemExit) as stop:
+            self.run_cli("replay-beliefs", "--klas", KLAS_MARKEER, "--uitgesloten", "--apply")
+        self.assertIn(f"{KLAS_MARKEER} heeft nu les volgens het lesrooster", str(stop.exception.code))
+        self.assertEqual((self.cosmos.upserts, self.backups()), ([], []))
+
+
+class MarkedDraftTest(_MilaTest):
+    """`draft`, `what-if` and `trace` read the marking too (#342): the number
+    comes from the replay without the marked oefeningen, and the concept says
+    per student how many do not count."""
+
+    def test_the_number_is_the_replay_without_them_and_the_concept_counts_them(self):
+        md_path, json_path, _ = self.draft(KLAS_MARKEER)
+        md = md_path.read_text(encoding="utf-8")
+        computed = self.student(json.loads(json_path.read_text(encoding="utf-8")), "u-mila")["computed"]
+
+        turns = TURNS["u-mila"]
+        los = rules.milestone_los(MILESTONE, GOALS)
+        without = rules.score(los, rules.replay(turns, GOALS), "medium")
+        app = rules.score(los, rules.replay(turns, GOALS, skip_excluded=False), "medium")
+        self.assertEqual((computed["coreCounted"], computed["proposal"]), (without.core_counted, without.proposal))
+        self.assertGreater(app.proposal, without.proposal)
+        self.assertIn("4 oefeningen tellen niet mee", self.section(md, "Overzicht"))
+        self.assertIn("**Telt niet mee:** 4 oefeningen (chatbot 3, geplakt 1), gemarkeerd door de leerkracht (#342).",
+                      self.section(md, "Mila Markeer"))
+        self.assertIn("markeerde als niet meetellend", md)
+
+    def test_what_if_starts_from_the_replay_without_them(self):
+        stdout = self.run_cli("what-if", "--klas", KLAS_MARKEER, "--leerling", "Mila", "--tel", "recall_a1")
+        without = rules.score(rules.milestone_los(MILESTONE, GOALS), rules.replay(TURNS["u-mila"], GOALS), "medium")
+        now = next(line for line in stdout.splitlines() if line.startswith("nu"))
+        self.assertEqual(now.split()[-1], str(without.proposal))
+        self.assertIn("geteld als aangetoond", stdout)
+
+    def test_the_trace_says_which_signals_do_not_count(self):
+        stdout = self.run_cli("trace", "--leerling", "Mila", "--dag", "2026-11-23", "--klas", KLAS_MARKEER)
+        marks = [line for line in stdout.splitlines() if line.lstrip().startswith("telt niet")]
+        self.assertEqual(len(marks), 4)
+        self.assertIn("geplakt (snel), beslist 2026-11-25", marks[0])
+        self.assertIn("chatbot (vet, snel), beslist 2026-11-25 — gemarkeerd: de signalen hieronder tellen niet mee", marks[1])
+
+
+# #342: a class of one made-up student for `markeer`: four oefeningen, one of
+# them already marked, and an audit record.
+KLAS_PLAK = "6PLAK"
+ACCOUNTS += [
+    {"uid": "u-noor", "firstName": "Noor", "lastName": "Plakker", "className": KLAS_PLAK,
+     "updatedAt": "2026-11-23T09:30:00Z", "calibration": {"difficulty": "medium"}},
+]
+_noor = lambda minute, *a, **k: _marked_turn("u-noor", minute, "sg-a", "recall_a1", *a, **k)  # noqa: E731
+_NOOR_AUDIT = {**_audit("2026-11-23T09:05:00.000Z", "sg-a", "u-noor"), "_etag": '"etag-u-noor-audit"'}
+TURNS["u-noor"] = [_noor(0), _noor(1), _noor(2), _noor(3, mark=_MARK), _NOOR_AUDIT]
+_NOOR_IDS = [t["id"] for t in TURNS["u-noor"]]
+
+
+class MarkeerTest(_MilaTest):
+    """`markeer` (#342) against the fake Cosmos: a dry run by default; with
+    `--apply` a backup of the docs first and `If-Match`; `--wis` takes the
+    marking away."""
+
+    def file(self, data: dict) -> str:
+        path = self.tmp / "markeer.json"
+        path.write_text(json.dumps(data), encoding="utf-8")
+        return str(path)
+
+    def marking(self, **extra) -> str:
+        return self.file({"reason": "chatbot", "decidedAt": "2026-11-25", **extra, "students": {"u-noor": [
+            {"id": _NOOR_IDS[0], "signs": ["vet", "snel"]},
+            {"id": _NOOR_IDS[1], "signs": ["aanspreking"], "reason": "geplakt"},
+            {"id": _NOOR_IDS[3], "signs": ["vet", "snel"]},  # already so
+            _NOOR_IDS[4],  # an audit record: no oefening
+            "t-bestaat-niet",
+        ]}})
+
+    def turn_upserts(self) -> list[tuple]:
+        return [u for u in self.cosmos.upserts if u[0] == "turn_history"]
+
+    def test_a_dry_run_writes_nothing(self):
+        stdout = self.run_cli("markeer", self.marking())
+
+        # in the file · found · to mark · already so · not found · no oefening
+        self.assertEqual(self.row_of(stdout, "Noor Plakker"), ["5", "4", "2", "1", "1", "1"])
+        self.assertIn("te markeren: 2 oefeningen bij 1 leerling(en).", stdout)
+        self.assertIn("Noor Plakker: t-bestaat-niet", stdout)
+        self.assertIn("Droge run: er is niets geschreven", stdout)
+        self.assertEqual((self.cosmos.upserts, self.backups()), ([], []))
+
+    def test_apply_backs_up_first_and_writes_with_if_match(self):
+        backed_up_before = []
+        upsert = self.cosmos.upsert
+
+        def watched(coll, doc, pk, etag=None):
+            backed_up_before.append(bool(self.backups()))
+            return upsert(coll, doc, pk, etag)
+
+        self.cosmos.upsert = watched
+        stdout = self.run_cli("markeer", self.marking(), "--apply")
+
+        self.assertEqual(backed_up_before, [True, True])
+        backup = json.loads(self.backups()[0].read_text(encoding="utf-8"))
+        self.assertIn("markeer", self.backups()[0].name)
+        self.assertEqual([d["id"] for d in backup["turn_history"]], _NOOR_IDS[:2])
+        self.assertTrue(all("excluded" not in d for d in backup["turn_history"]))
+        by_id = {t["id"]: t for t in TURNS["u-noor"]}
+        for coll, doc, pk, etag in self.turn_upserts():
+            before = by_id[doc["id"]]
+            self.assertEqual((pk, etag), ("u-noor", before["_etag"]))
+            self.assertEqual({k: v for k, v in doc.items() if k != "excluded"}, before)  # only the marking
+        first, second = (doc for _, doc, _, _ in self.turn_upserts())
+        self.assertEqual(first["excluded"], {"reason": "chatbot", "signs": ["vet", "snel"], "decidedAt": "2026-11-25"})
+        self.assertEqual(second["excluded"], {"reason": "geplakt", "signs": ["aanspreking"], "decidedAt": "2026-11-25"})
+        self.assertTrue(rules.is_excluded(first))
+        self.assertIn("geschreven 2, conflicten 0", stdout)
+        self.assertIn(f"Daarna, droog: evaluate.py replay-beliefs --klas {KLAS_PLAK} --uitgesloten", stdout)
+
+    def test_without_a_day_it_is_today_in_belgium_and_without_a_reason_it_stops(self):
+        path = self.file({"reason": "chatbot", "students": {"u-noor": [_NOOR_IDS[0]]}})
+        self.run_cli("markeer", path, "--apply")
+        (_, doc, _, _), = self.turn_upserts()
+        self.assertEqual(doc["excluded"], {"reason": "chatbot", "signs": [], "decidedAt": "2026-11-26"})
+        with self.assertRaises(SystemExit) as stop:
+            self.run_cli("markeer", self.file({"students": {"u-noor": [_NOOR_IDS[0]]}}))
+        self.assertIn("heeft geen reden", str(stop.exception.code))
+
+    def test_wis_takes_the_marking_away(self):
+        path = self.file({"students": {"u-noor": [_NOOR_IDS[3], _NOOR_IDS[0]]}})
+        stdout = self.run_cli("markeer", path, "--wis")
+        # in the file · found · to clear · already so (never marked)
+        self.assertEqual(self.row_of(stdout, "Noor Plakker"), ["2", "2", "1", "1", "0", "0"])
+        self.assertEqual(self.cosmos.upserts, [])
+
+        stdout = self.run_cli("markeer", path, "--wis", "--apply")
+        (coll, doc, pk, etag), = self.turn_upserts()
+        before = TURNS["u-noor"][3]
+        self.assertEqual((doc["id"], pk, etag), (before["id"], "u-noor", before["_etag"]))
+        self.assertNotIn("excluded", doc)
+        self.assertEqual(doc, {k: v for k, v in before.items() if k != "excluded"})
+        self.assertIn("markeer-wis", self.backups()[0].name)
+        self.assertEqual(json.loads(self.backups()[0].read_text(encoding="utf-8"))["turn_history"], [before])
+
+    def test_a_doc_changed_in_between_is_named_and_left(self):
+        upsert = self.cosmos.upsert
+
+        def racing(coll, doc, pk, etag=None):
+            if doc["id"] == _NOOR_IDS[1]:
+                raise self.cosmos.Conflict(doc["id"])
+            return upsert(coll, doc, pk, etag)
+
+        self.cosmos.upsert = racing
+        stdout = self.run_cli("markeer", self.marking(), "--apply")
+        self.assertIn(f"Noor Plakker: {_NOOR_IDS[1]} veranderde intussen", stdout)
+        self.assertIn("geschreven 1, conflicten 1 (draai het opnieuw voor die)", stdout)
+
+    def test_a_file_in_the_repo_or_an_unknown_student_stops(self):
+        with self.assertRaises(SystemExit) as stop:
+            self.run_cli("markeer", str(evaluate.REPO_ROOT / "markeer.json"))
+        self.assertIn("staat in de repo", str(stop.exception.code))
+        with self.assertRaises(SystemExit) as stop:
+            self.run_cli("markeer", self.file({"reason": "chatbot", "students": {"u-niemand": ["t-1"]}}))
+        self.assertIn("onbekende leerling(en) (uid): u-niemand", str(stop.exception.code))
+        self.assertEqual(self.cosmos.upserts, [])
+
+    def row_of(self, stdout: str, name: str) -> list[str]:
+        line = next(line for line in stdout.splitlines() if line.startswith(name))
+        return line.split()[-6:]
 
 
 if __name__ == "__main__":

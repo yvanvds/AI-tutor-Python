@@ -11,7 +11,9 @@ import datetime as dt
 import statistics
 from collections import Counter, defaultdict
 
-from rules import DIFF_ORDER, NEG_FACTOR, POS_FACTOR, LoState, MilestoneLo, belgian_time, is_audit, parse_at, turn_scope
+from rules import (
+    DIFF_ORDER, NEG_FACTOR, POS_FACTOR, LoState, MilestoneLo, belgian_time, is_audit, is_excluded, parse_at, turn_scope,
+)
 
 # Plain-Dutch labels for the report text; the raw names are app vocabulary.
 DIFF_NL = {"easy": "makkelijk", "medium": "gewoon", "hard": "moeilijk"}
@@ -452,6 +454,8 @@ def trace(turns: list[dict], contents: dict[str, dict], goals: dict) -> list[dic
                 "graded_by_key": bool((t or {}).get("gradedByKey")),
                 # #334: (times, characters), None when the record does not say.
                 "blocked_pastes": blocked_paste(t),
+                # #342: the teacher's marking, when the oefening does not count.
+                "excluded": t["excluded"] if t is not None and is_excluded(t) else None,
                 "has_turn": t is not None,
                 "has_content": c is not None,
                 "question": (c or {}).get("question"),
