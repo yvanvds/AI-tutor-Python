@@ -3929,6 +3929,23 @@ class AppLocalizationsEn extends AppLocalizations {
       'You practise on your own, with your own OpenAI key. Everything stays on this pc.';
 
   @override
+  String get contentLoading_title => 'Loading the content…';
+
+  @override
+  String contentLoading_count(int written, int total) {
+    return '$written of $total';
+  }
+
+  @override
+  String get contentLoading_hint =>
+      'The lessons and exercises are put on this pc.';
+
+  @override
+  String contentLoading_failed(String error) {
+    return 'The app could not start: $error';
+  }
+
+  @override
   String get schoolFile_error_unreadable =>
       'The file could not be read. Nothing has changed.';
 

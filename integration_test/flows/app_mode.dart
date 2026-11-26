@@ -13,6 +13,11 @@
 // second start loads nothing again. The second test loads the small fixture
 // bundle (test/fixtures/curriculum_bundle) instead.
 //
+// Loading it takes a while on a first start: every doc goes to its own file
+// on the pc. The window shows the loading page meanwhile and keeps painting
+// how far it is (#346) — when `main()` already knows the app runs without a
+// school, and after "Continue without a school" on the first-start choice.
+//
 // What needs a school is left out of the stand-alone app (#267): no grade
 // formula, no reports, no teacher group in the rail; no lesson badges, class
 // podium or teacher's badges in the trophy case; no word about a teacher or
@@ -62,6 +67,7 @@ import 'package:ai_tutor_python/features/progress/leerpad_page.dart';
 import 'package:ai_tutor_python/features/school/first_start_page.dart';
 import 'package:ai_tutor_python/features/shell/app_shell.dart';
 import 'package:ai_tutor_python/features/shell/shell_state.dart';
+import 'package:ai_tutor_python/features/standalone/content_loading_page.dart';
 import 'package:ai_tutor_python/features/standalone/standalone_welcome_page.dart';
 import 'package:ai_tutor_python/services/auth/cosmos_token_source.dart';
 import 'package:ai_tutor_python/services/badges/badge_service.dart';
@@ -140,6 +146,41 @@ Map<String, dynamic> _assetsJson(String name) =>
   return (goal: title(root), subgoal: title(sub));
 }
 
+/// How many docs the bundle in the assets holds.
+int _docsInAssets() => [
+  for (final c in (_assetsJson('manifest.json')['containers'] as Map).values)
+    (c as Map)['count'] as int,
+].fold(0, (a, b) => a + b);
+
+/// Pumps through the stand-alone loading page (#346) until the app is up,
+/// and returns every count it painted on the way ("120 of 2742"), each one
+/// once. A window held up by the loading paints one count at most.
+Future<List<String>> _countsWhileLoading(
+  WidgetTester tester,
+  AppHarness harness,
+) async {
+  final count = find.byKey(const ValueKey('content-loading-count'));
+  final counts = <String>[];
+  final watch = Stopwatch()..start();
+  while (find.byType(ContentLoadingPage).evaluate().isNotEmpty) {
+    if (watch.elapsed > kContentLoadTimeout) {
+      fail('still loading after $kContentLoadTimeout; counted $counts');
+    }
+    if (count.evaluate().isNotEmpty) {
+      final text = tester.widget<Text>(count).data!;
+      if (counts.isEmpty || counts.last != text) counts.add(text);
+    }
+    await tester.pump(const Duration(milliseconds: 100));
+  }
+  await harness.pumpUntilStarted(tester);
+  // ignore: avoid_print
+  print(
+    'Stand-alone start: ${watch.elapsedMilliseconds} ms on the loading '
+    'page, ${counts.length} counts painted',
+  );
+  return counts;
+}
+
 /// The school-only parts of the trophy case (#267), and one that stays.
 final Map<String, Finder> _trophyParts = {
   'podium': find.byKey(const ValueKey('badges-section-podium')),
@@ -175,7 +216,17 @@ void main() {
     // First start: nothing on the pc yet. No `curriculumBundle`: the one in
     // this build's assets, as `main()` loads it.
     var harness = AppHarness(appMode: const StandaloneMode(), localData: data);
-    await harness.boot(tester, waitForShell: false);
+    await harness.boot(tester, waitForShell: false, waitForContent: false);
+
+    // The window shows that the content loads, and how far it is, until the
+    // app is there (#346).
+    expect(find.byType(ContentLoadingPage), findsOneWidget);
+    expect(find.text('Loading the content…'), findsOneWidget);
+    final total = _docsInAssets();
+    final counts = await _countsWhileLoading(tester, harness);
+    expect(counts.length, greaterThanOrEqualTo(3), reason: '$counts');
+    expect(counts.last, endsWith(' of $total'));
+    expect(counts.toSet(), hasLength(counts.length));
 
     await pumpUntilFound(tester, find.byType(StandaloneWelcomePage));
     expect(find.byType(SignInPage), findsNothing);
@@ -420,6 +471,13 @@ void main() {
 
     await pumpUntilFound(tester, find.byType(FirstStartPage));
     await tester.tap(find.byKey(const ValueKey('first-start-without-school')));
+    // Not the choice, still, with nothing happening (#346): the loading page
+    // with how far the content is.
+    await pumpUntilFound(tester, find.byType(ContentLoadingPage));
+    expect(find.byType(FirstStartPage), findsNothing);
+    final counts = await _countsWhileLoading(tester, harness);
+    expect(counts.length, greaterThanOrEqualTo(3), reason: '$counts');
+    expect(counts.last, endsWith(' of ${_docsInAssets()}'));
     await pumpUntilFound(tester, find.byType(StandaloneWelcomePage));
     expect(find.byType(SignInPage), findsNothing);
     expect(harness.startedMode, const StandaloneMode());

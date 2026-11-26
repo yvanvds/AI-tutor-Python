@@ -1,6 +1,7 @@
 // The content the stand-alone mode ships with (#266): loaded at start when
 // it is new, never over the student's own data, never twice.
 
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -36,12 +37,15 @@ void main() {
 
   LocalCosmosClient open() => LocalCosmosClient.open(data);
 
-  Future<CurriculumInstall> install(LocalCosmosClient client) =>
-      installCurriculumBundle(
-        source: DirectoryCurriculumBundleSource(bundleDir),
-        client: client,
-        versionFile: curriculumVersionFile(data),
-      );
+  Future<CurriculumInstall> install(
+    LocalCosmosClient client, {
+    CurriculumProgress? onProgress,
+  }) => installCurriculumBundle(
+    source: DirectoryCurriculumBundleSource(bundleDir),
+    client: client,
+    versionFile: curriculumVersionFile(data),
+    onProgress: onProgress,
+  );
 
   Future<List<Map<String, dynamic>>> all(
     LocalCosmosClient client,
@@ -186,6 +190,113 @@ void main() {
     });
   });
 
+  test(
+    'a newer bundle with one doc changed writes only that doc (#346)',
+    () async {
+      final first = <(int, int)>[];
+      await install(open(), onProgress: (w, t) => first.add((w, t)));
+      // Every doc of the fixture, counted up to the end.
+      final total = first.first.$2;
+      expect(total, greaterThan(1));
+      expect(first.first, (0, total));
+      expect(first.last, (total, total));
+      expect(first, hasLength(total + 1));
+
+      final client = open();
+      Future<Map<String, Object?>> etags() async => {
+        for (final container in [
+          ...kBundleOwnedContainers,
+          'config',
+          'questions',
+        ])
+          for (final d in await all(client, container))
+            '$container/${d['id']}': d['_etag'],
+      };
+      final before = await etags();
+      expect(before, hasLength(total));
+      final goals = readJson('goals.json');
+      final toekennen = (goals['docs'] as List)
+          .cast<Map<String, dynamic>>()
+          .firstWhere((d) => d['id'] == 'toekennen');
+      toekennen['title'] = 'Toekennen (nieuw)';
+      writeJson('goals.json', goals);
+      final manifest = readJson('manifest.json');
+      manifest['contentVersion'] = 'one-changed';
+      writeJson('manifest.json', manifest);
+
+      final progress = <(int, int)>[];
+      expect(
+        await install(client, onProgress: (w, t) => progress.add((w, t))),
+        CurriculumInstall.installed,
+      );
+
+      expect(progress, [(0, 1), (1, 1)]);
+      final after = await etags();
+      expect(after.keys, unorderedEquals(before.keys));
+      for (final key in before.keys) {
+        if (key == 'goals/toekennen') {
+          expect(after[key], isNot(before[key]), reason: key);
+        } else {
+          expect(after[key], before[key], reason: key);
+        }
+      }
+      final changed = await open()
+          .container('goals')
+          .read('toekennen', partitionKey: 'goal');
+      expect(changed!['title'], 'Toekennen (nieuw)');
+      expect(jsonDecode(curriculumVersionFile(data).readAsStringSync()), {
+        'contentVersion': 'one-changed',
+      });
+    },
+  );
+
+  test('another storage than the local one gets the same docs, one at a '
+      'time, and the same count', () async {
+    final client = InMemoryCosmosClient();
+    final progress = <(int, int)>[];
+    expect(
+      await installCurriculumBundle(
+        source: DirectoryCurriculumBundleSource(bundleDir),
+        client: client,
+        versionFile: curriculumVersionFile(data),
+        onProgress: (w, t) => progress.add((w, t)),
+      ),
+      CurriculumInstall.installed,
+    );
+    final goals = await client
+        .container('goals')
+        .query('SELECT * FROM c', crossPartition: true);
+    expect(goals.map((g) => g['id']).toSet(), {'variabelen', 'toekennen'});
+    final total = progress.first.$2;
+    expect(progress.last, (total, total));
+    expect(progress, hasLength(total + 1));
+  });
+
+  test('a newer bundle writes again what was changed on the pc', () async {
+    await install(open());
+    final client = open();
+    final q = (await client
+        .container('questions')
+        .read('toekennen_aaaa', partitionKey: 'toekennen'))!;
+    await client.container('questions').upsert({
+      ...q,
+      'difficulty': 'hard',
+    }, partitionKey: 'toekennen');
+    final manifest = readJson('manifest.json');
+    manifest['contentVersion'] = 'newer';
+    writeJson('manifest.json', manifest);
+
+    final progress = <(int, int)>[];
+    await install(client, onProgress: (w, t) => progress.add((w, t)));
+
+    expect(progress, [(0, 1), (1, 1)]);
+    final back = await open()
+        .container('questions')
+        .read('toekennen_aaaa', partitionKey: 'toekennen');
+    expect(back!['difficulty'], isNot('hard'));
+    expect(back[kFromBundleField], isTrue);
+  });
+
   test('a bundle never writes a student container', () async {
     writeJson('accounts.json', {
       'container': 'accounts',
@@ -238,10 +349,12 @@ void main() {
         jsonDecode(File(p.join(shipped.path, name)).readAsStringSync())
             as Map<String, dynamic>;
 
-    // In memory: writing every doc to its own file takes a while (#346).
-    // The integration flow `app_mode` loads it into the local storage on
-    // disk, as a user's first start does.
-    test('the first start loads all of it, the next start nothing', () async {
+    // On disk, as a user's first start: every doc to its own file (#263).
+    // That takes a while, so it is written asynchronously, several files at
+    // a time (#346): the isolate stays free to paint the loading page, and
+    // the count reaches the end.
+    test('the first start loads all of it into the local storage without '
+        'holding up the isolate; the next start loads nothing', () async {
       final manifest = shippedJson('manifest.json');
       final counts = {
         for (final MapEntry(:key, :value)
@@ -250,18 +363,47 @@ void main() {
       };
       expect(counts.keys, containsAll(['goals', 'content', 'instructions']));
       expect(counts['goals'], greaterThan(0));
+      final total = counts.values.fold(0, (a, b) => a + b);
 
-      final client = InMemoryCosmosClient();
+      // The longest the isolate went without running a timer.
+      var last = DateTime.now();
+      var longestPause = Duration.zero;
+      final ticker = Timer.periodic(const Duration(milliseconds: 10), (_) {
+        final now = DateTime.now();
+        final pause = now.difference(last);
+        if (pause > longestPause) longestPause = pause;
+        last = now;
+      });
+      addTearDown(ticker.cancel);
+      final progress = <(int, int)>[];
+      final watch = Stopwatch()..start();
+      final result = await installCurriculumBundleAtStart(
+        client: open(),
+        localDataRoot: data,
+        onProgress: (w, t) => progress.add((w, t)),
+      );
+      watch.stop();
+      ticker.cancel();
+      // ignore: avoid_print
+      print(
+        'Real bundle, first start: $total docs in '
+        '${watch.elapsedMilliseconds} ms, longest pause '
+        '${longestPause.inMilliseconds} ms',
+      );
+
+      expect(result, CurriculumInstall.installed);
+      // Writing them one after the other, synchronously, held it up for the
+      // whole install (some 14 s on a desktop).
+      expect(longestPause, lessThan(const Duration(seconds: 3)));
+      expect(progress.first, (0, total));
+      expect(progress.last, (total, total));
+      expect(progress, hasLength(total + 1));
+
+      // On disk: the next start finds it all.
+      final client = open();
       Future<List<Map<String, dynamic>>> stored(String container) => client
           .container(container)
           .query('SELECT * FROM c', crossPartition: true);
-      expect(
-        await installCurriculumBundleAtStart(
-          client: client,
-          localDataRoot: data,
-        ),
-        CurriculumInstall.installed,
-      );
       for (final MapEntry(:key, :value) in counts.entries) {
         expect((await stored(key)).length, value, reason: key);
       }
@@ -272,14 +414,17 @@ void main() {
       });
 
       // The next start.
+      final again = <(int, int)>[];
       expect(
         await installCurriculumBundleAtStart(
           client: client,
           localDataRoot: data,
+          onProgress: (w, t) => again.add((w, t)),
         ),
         CurriculumInstall.upToDate,
       );
-    });
+      expect(again, isEmpty);
+    }, timeout: const Timeout(Duration(minutes: 3)));
 
     test('holds only content: no student container, no school setting, no '
         'Cosmos field', () {

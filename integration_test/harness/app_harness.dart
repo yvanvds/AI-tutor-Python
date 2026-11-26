@@ -53,6 +53,7 @@ import 'package:ai_tutor_python/features/goals/goals_page.dart';
 import 'package:ai_tutor_python/features/options/options_page.dart';
 import 'package:ai_tutor_python/features/shell/app_shell.dart';
 import 'package:ai_tutor_python/features/shell/shell_state.dart';
+import 'package:ai_tutor_python/features/standalone/content_loading_page.dart';
 import 'package:ai_tutor_python/main.dart';
 import 'package:ai_tutor_python/services/auth/auth_service.dart';
 import 'package:ai_tutor_python/services/auth/cosmos_token_source.dart';
@@ -524,7 +525,8 @@ class AppHarness {
   Directory? _ownSchoolDir;
   ProviderContainer? _container;
 
-  /// The first-start choice's own container (#307), while it is up.
+  /// The own container of the first-start choice (#307) or of the
+  /// stand-alone loading page (#346), while it is up.
   ProviderContainer? _choiceContainer;
 
   /// The app's provider container; read services / state the way the
@@ -535,7 +537,16 @@ class AppHarness {
   /// flow on a seeded account lands on. A flow about the screens *before*
   /// the shell (the local-key gate, #126) passes `waitForShell: false` and
   /// waits for what it expects itself.
-  Future<void> boot(WidgetTester tester, {bool waitForShell = true}) async {
+  ///
+  /// Stand-alone, the app starts as `main()` starts it (#346): the loading
+  /// page first, the local storage and the content after the first frame.
+  /// [boot] waits for that ([pumpUntilStarted]); a flow about the loading
+  /// page passes `waitForContent: false` and waits itself.
+  Future<void> boot(
+    WidgetTester tester, {
+    bool waitForShell = true,
+    bool waitForContent = true,
+  }) async {
     // Logical size times the machine's ratio: the layout is the same on a
     // 100 % desktop and a 150 % laptop. Reset in a tear-down, not in
     // [dispose], so a failed flow cannot hand its size to the next one in
@@ -556,6 +567,8 @@ class AppHarness {
     // student, and announces and marks seen what that flow is waiting for.
     addTearDown(() => dispose(tester));
 
+    // Stand-alone, the mode `main()` starts behind the loading page (#346).
+    AppMode? standalone;
     if (decideMode) {
       // As in `main()` (#307), with the build's school kept as the school
       // file (#308).
@@ -589,15 +602,34 @@ class AppHarness {
         );
         return;
       }
-      await _start(mode);
+      if (mode is StandaloneMode) {
+        standalone = mode;
+      } else {
+        await _start(mode);
+      }
+    } else if (localData != null) {
+      standalone = appMode ?? const StandaloneMode();
     } else {
       await _start(appMode ?? kTestSchoolMode);
     }
 
-    // Same root and scope as `main()`.
-    await tester.pumpWidget(
-      UncontrolledProviderScope(container: container, child: const GoalsApp()),
-    );
+    if (standalone != null) {
+      // The loading page puts the app there itself.
+      await _startStandalone(
+        tester,
+        standalone,
+        waitForContent: waitForContent,
+      );
+      if (!waitForContent) return;
+    } else {
+      // Same root and scope as `main()`.
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const GoalsApp(),
+        ),
+      );
+    }
     if (waitForShell) {
       await pumpUntil(
         tester,
@@ -606,10 +638,50 @@ class AppHarness {
     }
   }
 
+  /// Stand-alone as `main()` starts it (#346): [StandaloneStartApp], which
+  /// shows the loading page and boots [mode] through [_start] after the
+  /// first frame. With [waitForContent], waits for the app ([pumpUntilStarted]).
+  Future<void> _startStandalone(
+    WidgetTester tester,
+    AppMode mode, {
+    required bool waitForContent,
+  }) async {
+    final loading = ProviderContainer(
+      overrides: [
+        systemLocaleProvider.overrideWithValue(const Locale('en', 'US')),
+        systemBrightnessProvider.overrideWithValue(systemBrightness),
+      ],
+    );
+    _choiceContainer = loading;
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: loading,
+        child: StandaloneStartApp(mode: mode, boot: _start),
+      ),
+    );
+    if (waitForContent) await pumpUntilStarted(tester);
+  }
+
+  /// Pumps until the stand-alone start is done (#346): the app's container
+  /// is up and the loading page gone. A first start writes every doc of the
+  /// shipped content to disk, so this waits up to [kContentLoadTimeout].
+  Future<void> pumpUntilStarted(WidgetTester tester) => pumpUntil(
+    tester,
+    () =>
+        _container != null &&
+        find.byType(ContentLoadingPage).evaluate().isEmpty,
+    timeout: kContentLoadTimeout,
+    reason: 'the stand-alone start never got past the loading page',
+  );
+
   /// The app's container for [mode], as `bootApp` in `main.dart` makes it:
   /// the data behind `CosmosClient.instance`, then the container with every
-  /// fake, then the stored sign-in or profile.
-  Future<ProviderContainer> _start(AppMode mode) async {
+  /// fake, then the stored sign-in or profile. Stand-alone, [onProgress]
+  /// hears how far the content is.
+  Future<ProviderContainer> _start(
+    AppMode mode, [
+    CurriculumProgress? onProgress,
+  ]) async {
     startedMode = mode;
     final localData = this.localData;
     final useLocal = decideMode ? mode is StandaloneMode : localData != null;
@@ -625,6 +697,7 @@ class AppHarness {
         client: client,
         localDataRoot: localData,
         source: curriculumBundle,
+        onProgress: onProgress,
       );
     } else {
       // As `bootApp` reaches the school's database (#336): the access the
@@ -857,6 +930,11 @@ Future<void> chooseClassAndSave(WidgetTester tester, String className) async {
   await tester.tap(find.byKey(const Key('class-choice-save')));
   await tester.pump();
 }
+
+/// How long a stand-alone start may take to load the content it ships with
+/// (#346): on a first start every doc is written to disk, which on a busy
+/// runner with a virus scanner takes a good while longer than on a desktop.
+const Duration kContentLoadTimeout = Duration(minutes: 3);
 
 /// Pumps real frames until [condition] holds. Preferred over
 /// `pumpAndSettle` here: the code editor's cursor blink and the 5 s Cosmos

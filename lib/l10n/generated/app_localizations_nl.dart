@@ -3957,6 +3957,23 @@ class AppLocalizationsNl extends AppLocalizations {
       'Je oefent alleen, met je eigen OpenAI-sleutel. Alles blijft op deze pc.';
 
   @override
+  String get contentLoading_title => 'De inhoud wordt geladen…';
+
+  @override
+  String contentLoading_count(int written, int total) {
+    return '$written van $total';
+  }
+
+  @override
+  String get contentLoading_hint =>
+      'De lessen en oefeningen worden op deze pc gezet.';
+
+  @override
+  String contentLoading_failed(String error) {
+    return 'De app kon niet starten: $error';
+  }
+
+  @override
   String get schoolFile_error_unreadable =>
       'Het bestand kon niet gelezen worden. Er is niets veranderd.';
 

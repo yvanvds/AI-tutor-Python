@@ -6448,6 +6448,30 @@ abstract class AppLocalizations {
   /// **'You practise on your own, with your own OpenAI key. Everything stays on this pc.'**
   String get firstStart_withoutHint;
 
+  /// No description provided for @contentLoading_title.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading the content…'**
+  String get contentLoading_title;
+
+  /// No description provided for @contentLoading_count.
+  ///
+  /// In en, this message translates to:
+  /// **'{written} of {total}'**
+  String contentLoading_count(int written, int total);
+
+  /// No description provided for @contentLoading_hint.
+  ///
+  /// In en, this message translates to:
+  /// **'The lessons and exercises are put on this pc.'**
+  String get contentLoading_hint;
+
+  /// No description provided for @contentLoading_failed.
+  ///
+  /// In en, this message translates to:
+  /// **'The app could not start: {error}'**
+  String contentLoading_failed(String error);
+
   /// No description provided for @schoolFile_error_unreadable.
   ///
   /// In en, this message translates to:
