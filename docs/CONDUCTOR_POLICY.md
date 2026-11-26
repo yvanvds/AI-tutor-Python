@@ -2728,6 +2728,19 @@ follow_up_allowed_in_chain():
 The two `follow_up_allowed` variants encode the depth-1-default vs.
 depth-2-with-flag rule.
 
+**A follow-up lapses when a new question comes (#340).** A follow-up is
+answered in the chat, before anything else is put in front of the
+student. When the next question comes first — "Volgende" under a quiz
+whose follow-up is open, or code sent from the editor next to a
+follow-up, whose grade asks for the next exercise — the follow-up is
+closed the moment that question is planned, and never graded. The answer
+that follows is the answer to the new question: no follow-up, its own
+plan, level, question ID and `askedAt`, and into the bank as any new
+question (2.7). Until #340 the follow-up stayed open, and the answer to
+the new question was recorded as the follow-up's — capped at weak, no
+own question, without its question ID, with the old follow-up as its
+question in `turn_content`.
+
 ### 6.6 The follow-up field on the grader response
 
 Part 3 carries a `followUp` field on the grader response:

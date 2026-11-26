@@ -237,7 +237,9 @@ class TutorService extends Notifier<TutorState> {
 
   /// Set when the grader emitted a `followUp` and the §6.3 conditions
   /// allowed presenting it. Cleared once the follow-up answer has been
-  /// graded (or its conditions fail and we fall back to a regular probe).
+  /// graded (or its conditions fail and we fall back to a regular probe),
+  /// and when a new question is put in front of the student before that
+  /// (#340, [_firePlan]): the follow-up lapses then, ungraded.
   _FollowUpInFlight? _followUpInFlight;
 
   /// Set when an MCQ-driven grading advanced the subgoal and the next one has
@@ -849,6 +851,17 @@ class TutorService extends Notifier<TutorState> {
           .toList(),
     });
     _conductor.notePlannedQuestion(plan);
+    // A follow-up still open lapses (#340): the question coming now is the
+    // one in front of the student, and what they answer is the answer to
+    // it — with its own plan, level, ID and moment, and a place in the bank.
+    // "Volgende" under a quiz, or code sent from the editor next to a
+    // follow-up, asked for it; the follow-up used to stay open, and the
+    // answer to this question was recorded as the follow-up's.
+    final lapsed = _followUpInFlight;
+    if (lapsed != null) {
+      _followUpInFlight = null;
+      _debug.recordEvent('tutor.follow_up_lapsed', {'depth': lapsed.depth});
+    }
     _inFlightPlan = plan;
     // Its moment is set when it comes in; until then it is not known (#220).
     _questionAskedAt = null;
@@ -1911,8 +1924,8 @@ class TutorService extends Notifier<TutorState> {
     // and the order of its options in the request, and the instruction not
     // to give its answer away. Nothing else moves: the quiz, its plan and
     // the exercise type are as they were. Ahead of the follow-up below: the
-    // quiz is the question in front of the student, so a follow-up still
-    // in flight is one of an exercise before it.
+    // quiz is the question in front of the student. (A follow-up of an
+    // exercise before it lapsed when the quiz was planned, #340.)
     if (_currentExerciseType == 'multiple_choice' && _quizAwaitingPick) {
       return ChatRequestType.studentQuestion;
     }

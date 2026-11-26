@@ -342,8 +342,8 @@ Routing (`TutorService.handleStudentMessage`):
 - Theory page on screen → `content_question`, as above (#132).
 - The exercise in flight is the quiz and it waits for its pick →
   `student_question`, the same request a question during a code exercise
-  is. Ahead of a follow-up still in flight: that one belongs to an exercise
-  before the quiz.
+  is. Ahead of the follow-up check below; a follow-up of an exercise
+  before the quiz lapsed when the quiz was planned (#340).
 - After the pick, a follow-up the grader asked under the feedback is
   answered in the chat as for any exercise (`follow_up_answer`, "Grading
   follow-up answers" below). Any other message is a `student_question`.

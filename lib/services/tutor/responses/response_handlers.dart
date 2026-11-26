@@ -250,7 +250,8 @@ class McqFeedbackHandler extends ResponseHandler<McqFeedback> {
     );
     // Advance is deferred until the student clicks "Volgende" inside the
     // MCQ render — see TutorService.advanceFromMcq. A follow-up presented
-    // here will simply replace that flow on the next student turn.
+    // here is answered in the chat; "Volgende" instead puts the next
+    // exercise up, and the follow-up lapses with it (#340).
   }
 }
 
