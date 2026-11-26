@@ -4005,5 +4005,5 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get auth_localKey_schoolEscape =>
-      'At a school? Import your school\'s file.';
+      'At a school? Import the school file your teacher gives you.';
 }

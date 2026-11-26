@@ -2151,5 +2151,5 @@
   "options_school_leave_cancel": "Cancel",
   "options_school_standalone": "At a school? Import your school's file. What you did here stays on this pc.",
   "options_school_import": "Import school file",
-  "auth_localKey_schoolEscape": "At a school? Import your school's file."
+  "auth_localKey_schoolEscape": "At a school? Import the school file your teacher gives you."
 }

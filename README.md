@@ -257,7 +257,7 @@ When you start the app for the first time:
    { "id": "global", "type": "config", "Model": "gpt-4o", "ApiKey": "sk-..." }
    ```
 
-   Every account with the school's key (the **KEY** switch on the **Students** page) calls OpenAI with it; the other accounts use a key of their own, entered in the app. A new key reaches every open app within a few seconds, without a new build. While `ApiKey` is empty, the app falls back on `OPEN_AI_API_KEY` from `.env` (Step 4); without that, the tutor sends nothing and tells the student that the school has not set a key yet. Changing the model in the app leaves `ApiKey` as it is. From a script, `tooling/evaluation/cosmos.py` can read the document and write it back with `ApiKey` filled in (partition key `config`).
+   Every account with the school's key (the **KEY** switch on the **Students** page) calls OpenAI with it; the other accounts use a key of their own, entered in the app. A new key reaches every open app within a few seconds, without a new build. While `ApiKey` is empty, the app falls back on `OPEN_AI_API_KEY` from `.env` (Step 4), though not in a release ([Step 7](#how-a-release-is-built)); without that, the tutor sends nothing and tells the student that the school has not set a key yet. Changing the model in the app leaves `ApiKey` as it is. From a script, `tooling/evaluation/cosmos.py` can read the document and write it back with `ApiKey` filled in (partition key `config`).
 6. Optional: edit `config/global` from the Cosmos Data Explorer if you want to switch to a different OpenAI model (e.g. `gpt-4o-mini` for cheaper runs). The field is `Model`. `MinimumVersion` (#165) is optional: set it (for example `2.6.0`) to keep every older build out — such a build shows an update screen instead of the app until it is updated, so a device that keeps declining the update cannot go on writing documents in an outdated shape. Leave it out, or blank, to allow every build. `QuestionBankMinimum` and `QuestionBankShare` (#186) are optional too: once the question bank holds at least `QuestionBankMinimum` questions that fit what the tutor is about to ask (default 8) and that the student has not had, the question comes from the bank instead of being generated with a chance of `QuestionBankShare` (0 to 1, default 0.5; 0 switches serving from the bank off). See `docs/CONDUCTOR_POLICY.md` §2.7. `TurnContentKeepUntil` (#228) is optional as well: the day, `MM-DD`, until which the question, answer and feedback of each oefening are kept in `turn_content` (midnight Belgian time; default `07-01`, the end of the school year). See `docs/CONDUCTOR_POLICY.md` §8.4.
 
 Once that is done, hand the installer to a student. They sign in with their school account, the app creates their profile automatically, and the tutor starts at the first incomplete subgoal.
@@ -283,6 +283,24 @@ pre-release tag is never pushed at a student.
 To point the app at your own fork, change `kReleaseOwner` / `kReleaseRepo` in
 [lib/core/github_release.dart](lib/core/github_release.dart). If you do not
 need auto-updates, you can ignore this entirely; the app still works.
+
+### How a release is built
+
+A release has no school data ([#308](https://github.com/yvanvds/AI-tutor-Python/issues/308)): the school's settings come from the school file ([The school file](#the-school-file)) and from `config/global`, and the app reaches the school's database with the user's own sign-in. Your `.env` stays as it is, for development. For the build, `tooling/build_release.ps1` puts a release `.env` in its place, with the school's values replaced by the placeholders CI uses (`GITHUB_OAUTH_CLIENT_ID` is no school data and stays). It regenerates the envied files from it and checks with `test/tooling/release_without_school_data_test.dart` that the build has no school data; a failed check stops the release before the version is bumped. Afterwards, also when something fails, your `.env` and the generated files are put back as they were.
+
+Before the first release without school data:
+
+- Fill in `ApiKey` in `config/global` ([Step 6](#step-6--first-run-and-bootstrapping-content)). A release has no fallback for it: while `ApiKey` is empty, the tutor sends nothing and tells the students that the school has not set a key yet.
+- Set up and check the roles and the admin consent of [Access with the user's own sign-in](#access-with-the-users-own-sign-in-for-an-administrator). Without them the database refuses every request of the app.
+
+```powershell
+pwsh tooling/build_release.ps1                  # bump, build, commit, tag, push and publish
+pwsh tooling/build_release.ps1 -CheckOnly       # only the release .env and its check: bumps and builds nothing
+pwsh tooling/build_release.ps1 -SkipPublish     # build the installer, publish nothing
+pwsh tooling/build_release.ps1 -WithSchoolData  # emergency release, built as before #308
+```
+
+`-WithSchoolData` builds with your `.env` and its generated files as they are, without the release `.env` and without the check, the way every release before #308 was built. Keep it for an emergency. When an envied class reads a new `.env` key, the script stops until the key is listed at its top, as school data (`SchoolEnvValues`) or as a key to keep (`KeptEnvKeys`).
 
 ---
 

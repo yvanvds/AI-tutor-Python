@@ -34,7 +34,10 @@
 // The release after it (#308, step 3; #336) has no school data. The school
 // file of step 1 says nothing about the access, and still reaches the
 // database: with a token from the stored sign-in, on every request. The
-// student stays signed in, and the file stays as step 1 wrote it.
+// student stays signed in, and the file stays as step 1 wrote it. A pc that
+// skipped step 1 has no file: the first-start choice asks and says that the
+// teacher gives the school file, and with that file the stored sign-in still
+// holds. The key screen says it too, for whoever went on without a school.
 //
 // Every other flow runs in school mode (the harness default); this one boots
 // the real app in both.
@@ -379,7 +382,17 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('standalone-welcome-start')));
     await pumpUntilFound(tester, find.byType(LocalKeyGateScreen));
 
-    // The way to a school, on the key screen: stored, then a restart.
+    // The way to a school, on the key screen: it says where the school file
+    // comes from (#308), then stored, then a restart.
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('local-key-school-file')),
+        matching: find.text(
+          'At a school? Import the school file your teacher gives you.',
+        ),
+      ),
+      findsOneWidget,
+    );
     await tester.tap(find.byKey(const Key('local-key-school-file')));
     await pumpUntilFound(tester, find.byKey(const Key('school-file-restart')));
     expect(
@@ -687,6 +700,91 @@ void main() {
     // The file is left as step 1 wrote it.
     expect(school.readAsStringSync(), written);
     expect(school.lastModifiedSync(), writtenAt);
+
+    await harness.dispose(tester);
+  });
+
+  // #308, step 3 ----------------------------------------------------------
+
+  testWidgets('the release without school data on a pc that skipped the '
+      'transitional release: the choice says the teacher gives the school '
+      'file; with it the student is signed in as before', (tester) async {
+    final appData = tempDir('ai_tutor_appdata_');
+    final school = File('${appData.path}/school.json');
+    final databaseScope =
+        '${CosmosTokenSource.scopeFor(exampleSchool.databaseEndpoint)} '
+        'offline_access';
+    bool forDatabase(http.Request r) => r.bodyFields['scope'] == databaseScope;
+    final tokenRequests = <http.Request>[];
+    final entra = MockClient((request) async {
+      tokenRequests.add(request);
+      final database = forDatabase(request);
+      return http.Response(
+        jsonEncode({
+          'access_token': database ? 'database-token' : 'sign-in-access',
+          'refresh_token': 'stored-refresh',
+          if (!database)
+            'id_token': _jwt({
+              'oid': studentIdentity.oid,
+              'name': studentIdentity.displayName,
+              'email': studentIdentity.email,
+            }),
+          'expires_in': 3600,
+        }),
+        200,
+      );
+    });
+    // Signed in, as every install of the school is, but without the school
+    // file step 1 would have written: a build without school data cannot
+    // tell which school this is.
+    final harness = AppHarness(
+      decideMode: true,
+      schoolData: appData,
+      schoolFilePicker: () async => exampleSchoolFile(),
+      entra: entra,
+      prefs: {
+        'azure_auth_tokens_v1': jsonEncode({
+          'access_token': 'old-access',
+          'refresh_token': 'stored-refresh',
+          'id_token': null,
+          'access_token_expiry': null,
+        }),
+      },
+    );
+    await harness.boot(tester, waitForShell: false);
+
+    // The choice, with no school picked for the student, and the line that
+    // says where the school file comes from.
+    await pumpUntilFound(tester, find.byType(FirstStartPage));
+    expect(
+      find.text(
+        'Using the app at school? Then your teacher gives you a school file.',
+      ),
+      findsOneWidget,
+    );
+    expect(find.byKey(const ValueKey('first-start-school')), findsOneWidget);
+    expect(find.byType(SignInPage), findsNothing);
+    expect(find.byType(AppShell), findsNothing);
+    expect(harness.startedMode, isNull);
+    expect(school.existsSync(), isFalse);
+    expect(tokenRequests, isEmpty);
+
+    // With the file the teacher gave: the stored sign-in still holds, so the
+    // student is back in the app without signing in again.
+    await tester.tap(find.byKey(const ValueKey('first-start-school')));
+    await pumpUntilFound(tester, find.byType(AppShell));
+    expect(find.byType(SignInPage), findsNothing);
+    expect(find.byTooltip('Sign out'), findsOneWidget);
+    expect(harness.startedMode, SchoolMode(exampleSchool));
+    expect(school.existsSync(), isTrue);
+    expect(tokenRequests.first.bodyFields['refresh_token'], 'stored-refresh');
+    expect(tokenRequests.first.url.path, contains(exampleSchool.tenantId));
+    // A build without school data: the database with the sign-in.
+    expect(harness.cosmos.authorizations, isNotEmpty);
+    expect(harness.cosmos.authorizations.toSet(), {
+      Uri.encodeComponent('type=aad&ver=1.0&sig=database-token'),
+    });
+    expect(tester.takeException(), isNull);
 
     await harness.dispose(tester);
   });

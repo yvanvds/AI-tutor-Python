@@ -4033,5 +4033,5 @@ class AppLocalizationsNl extends AppLocalizations {
 
   @override
   String get auth_localKey_schoolEscape =>
-      'Zit je op een school? Importeer het bestand van je school.';
+      'Zit je op een school? Importeer het schoolbestand dat je van je leerkracht krijgt.';
 }

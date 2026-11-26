@@ -1148,5 +1148,5 @@
   "options_school_leave_cancel": "Annuleren",
   "options_school_standalone": "Zit je op een school? Importeer het bestand van je school. Wat je hier deed, blijft op deze pc.",
   "options_school_import": "Schoolbestand importeren",
-  "auth_localKey_schoolEscape": "Zit je op een school? Importeer het bestand van je school."
+  "auth_localKey_schoolEscape": "Zit je op een school? Importeer het schoolbestand dat je van je leerkracht krijgt."
 }

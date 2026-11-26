@@ -6571,7 +6571,7 @@ abstract class AppLocalizations {
   /// No description provided for @auth_localKey_schoolEscape.
   ///
   /// In en, this message translates to:
-  /// **'At a school? Import your school\'s file.'**
+  /// **'At a school? Import the school file your teacher gives you.'**
   String get auth_localKey_schoolEscape;
 }
 

@@ -166,7 +166,9 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(LocalKeyGateScreen), findsOneWidget);
 
-    await tester.tap(find.text("At a school? Import your school's file."));
+    await tester.tap(
+      find.text('At a school? Import the school file your teacher gives you.'),
+    );
     await tester.pumpAndSettle();
 
     expect(
