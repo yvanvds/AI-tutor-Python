@@ -14,31 +14,35 @@ The tutor follows a teacher-defined goal tree, picks the type of exercise (multi
 
 ---
 
-> **For now the app only works for students of SMA Arcadia.** They sign in with their Arcadia Microsoft account, and the teacher switches the account on. A version you can use outside the school is being worked on: follow [#261](https://github.com/yvanvds/AI-tutor-Python/issues/261).
+> **The app works with a school file from the teacher, or without a school.** The installer of the [latest release](https://github.com/yvanvds/AI-tutor-Python/releases/latest) has no school built in. With the school file, students sign in with their school's Microsoft account and work in their school's database. Without one, the app runs stand-alone ([#261](https://github.com/yvanvds/AI-tutor-Python/issues/261)): a local profile, everything stays on the pc, and the user enters an OpenAI key of their own.
 
-## ⚠️ This build cannot be used as-is
+## Using the app in your own school
 
-The published binaries are hard-wired to **our school's Microsoft 365 (Entra ID) tenant** — only accounts in that tenant can sign in, and they are the only accounts the configured Azure Cosmos DB will accept. If you download a release from this repository and run it, you will get stuck on the sign-in screen.
+A school does not need a build of its own. It sets up its own environment once, and hands out a school file:
 
-To use this project in your own classroom you have to **build your own copy** with your own credentials. The good news: you do not need to touch any of the Dart code. You only need to:
+1. An OpenAI API key ([Step 1](#step-1--create-an-openai-api-key)). It goes in the school's own database, not in the school file.
+2. An app registration in the school's own Microsoft Entra tenant ([Step 2](#step-2--create-the-microsoft-entra-app-registration)), for the sign-in.
+3. A Cosmos DB account with its containers ([Step 3](#step-3--create-the-azure-cosmos-db)) and its content: the goals, the lessons and the tutor's instructions ([Step 6](#step-6--first-run-and-bootstrapping-content)).
+4. The admin consent and the roles of [Access with the user's own sign-in](#access-with-the-users-own-sign-in-for-an-administrator), so that the database accepts each user's own sign-in.
+5. A [school file](#the-school-file) for the students: a small JSON file with no keys or passwords in it.
 
-1. Create three things in the cloud (one Entra app registration, one Cosmos DB account, one OpenAI API key).
-2. Paste six values into a `.env` file.
-3. Run two commands to produce a Windows installer.
+The teacher's tooling (writing the goals and lessons to the database, the sign-in check) runs from a copy of this repository and reads its values from a `.env` ([Step 4](#step-4--get-the-source-code-and-configure-env)). Building the app yourself ([Step 5](#step-5--build-the-installer)) is only for working on the app itself, or for releases of your own ([Step 7](#step-7-optional--updates)).
 
-The rest of this README walks through that. No prior Flutter/Dart experience is required, but you should be comfortable opening the Azure portal, copying GUIDs, and running PowerShell commands.
+You do not need to touch any of the Dart code, and no prior Flutter/Dart experience is required, but you should be comfortable opening the Azure portal, copying GUIDs, and running PowerShell commands.
+
+Without a school, nothing has to be set up: install the app and pick *Continue without a school* at the first start.
 
 ---
 
 ## What you will end up with
 
-A `python_teacher_install.exe` (Inno Setup installer, ~150 MB) that you can hand to students. After install they sign in once with their school Microsoft account and the app remembers them. There is also a built-in updater: publish a GitHub release with the installer attached and every running copy will offer to update itself.
+Students install the app from the latest release, pick the school file at the first start and sign in once with their school Microsoft account; the app remembers them. The app updates itself: every running copy offers each new release (Step 7). A build of your own gives you a `python_teacher_install.exe` of your own (Inno Setup installer, ~80 MB).
 
 ---
 
 ## Prerequisites on your machine
 
-You need these tools installed once. All free.
+For the school setup alone, Git, Python 3 (for the teacher's tooling) and the Azure CLI (for the roles) are enough. For a build of your own you need these tools installed once. All free.
 
 1. **Flutter SDK 3.47.1** — <https://docs.flutter.dev/get-started/install/windows>. After installing run `flutter doctor` and fix any red items, especially the Visual Studio "Desktop development with C++" workload (required for Windows builds). This is the exact version CI installs (`FLUTTER_VERSION` in [.github/workflows/build.yml](.github/workflows/build.yml)). An older SDK now fails `flutter pub get` outright, because `pubspec.yaml` requires `sdk: ^3.13.1` (the Dart version bundled with Flutter 3.47.1). Building works on newer ones, but `dart format` output differs between Dart versions, so only this one is guaranteed to agree with CI's format gate.
 2. **Git** — <https://git-scm.com/download/win>.
@@ -245,7 +249,7 @@ The installer ends up in `dist/<version>/python_teacher_install.exe`. That is th
 
 When you start the app for the first time:
 
-1. Sign in with your own (Teacher-role) Microsoft account. The app creates an `accounts/{your-uid}` document automatically.
+1. Sign in with your own (Teacher-role) Microsoft account. The app creates an `accounts/{your-uid}` document automatically. A release first asks how you use the app: pick *I have a file from my school* and the school file ([The school file](#the-school-file)). It then reaches the database with your sign-in: set up the roles and the consent of [Access with the user's own sign-in](#access-with-the-users-own-sign-in-for-an-administrator) before this step.
 2. Because you have the `Teacher` role, you will see the teacher pages in the sidebar: **Goals**, **Lesson content**, **Questions**, **Instructions**, **Students**, …
 3. **Instructions.** The prompts that shape the tutor are in [instructions-export.md](instructions-export.md). Go to **Instructions** and use **Import from Markdown** to load it. Each document's id is the name of a request type in `ChatRequestType` ([lib/core/chat_request_type.dart](lib/core/chat_request_type.dart)), plus `alwaysInclude`, which goes along with every call; the file is the full list. It can lag behind what runs live, so if you have access to a working deployment, export a fresh copy there first (**Export all to Markdown**).
 
@@ -260,7 +264,7 @@ When you start the app for the first time:
    Every account with the school's key (the **KEY** switch on the **Students** page) calls OpenAI with it; the other accounts use a key of their own, entered in the app. A new key reaches every open app within a few seconds, without a new build. While `ApiKey` is empty, the app falls back on `OPEN_AI_API_KEY` from `.env` (Step 4), though not in a release ([Step 7](#how-a-release-is-built)); without that, the tutor sends nothing and tells the student that the school has not set a key yet. Changing the model in the app leaves `ApiKey` as it is. From a script, `tooling/evaluation/cosmos.py` can read the document and write it back with `ApiKey` filled in (partition key `config`).
 6. Optional: edit `config/global` from the Cosmos Data Explorer if you want to switch to a different OpenAI model (e.g. `gpt-4o-mini` for cheaper runs). The field is `Model`. `MinimumVersion` (#165) is optional: set it (for example `2.6.0`) to keep every older build out — such a build shows an update screen instead of the app until it is updated, so a device that keeps declining the update cannot go on writing documents in an outdated shape. Leave it out, or blank, to allow every build. `QuestionBankMinimum` and `QuestionBankShare` (#186) are optional too: once the question bank holds at least `QuestionBankMinimum` questions that fit what the tutor is about to ask (default 8) and that the student has not had, the question comes from the bank instead of being generated with a chance of `QuestionBankShare` (0 to 1, default 0.5; 0 switches serving from the bank off). See `docs/CONDUCTOR_POLICY.md` §2.7. `TurnContentKeepUntil` (#228) is optional as well: the day, `MM-DD`, until which the question, answer and feedback of each oefening are kept in `turn_content` (midnight Belgian time; default `07-01`, the end of the school year). See `docs/CONDUCTOR_POLICY.md` §8.4.
 
-Once that is done, hand the installer to a student. They sign in with their school account, the app creates their profile automatically, and the tutor starts at the first incomplete subgoal.
+Once that is done, hand out the school file (and your own installer, if you built one). A student installs the app, picks the school file and signs in with their school account; the app creates their profile automatically, and the tutor starts at the first incomplete subgoal.
 
 ---
 
@@ -435,7 +439,7 @@ A build that has a school configuration in its `.env` (Step 4) starts in that sc
 
 The school's OpenAI key is not in the school file either: it is `ApiKey` in the school's own `config/global` (Step 6), so every school pays for its own use.
 
-Today only SMA Arcadia's setup exists. The school file only spreads the configuration: a school that wants the school mode still needs Steps 2 and 3 (its own app registration and database, with its content), and until access through the user's own sign-in is switched on ([#306](https://github.com/yvanvds/AI-tutor-Python/issues/306)) a build made with that school's `.env` as well. The sign-in needs the roles and the consent of the next section.
+The school file only spreads the configuration: a school that wants the school mode still needs Steps 2 and 3 (its own app registration and database, with its content) and the roles and the consent of the next section. It needs no build of its own: a release has no school data ([How a release is built](#how-a-release-is-built)) and reaches the database with the user's own sign-in, so the school file is all its students need.
 
 ---
 

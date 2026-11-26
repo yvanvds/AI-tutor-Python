@@ -88,8 +88,9 @@
         <div class="notice">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 11v5M12 8v.01" /></svg>
           <p>
-            <strong class="notice-title">Today only for SMA Arcadia</strong>
-            The app currently only works with the school accounts of SMA Arcadia.
+            <strong class="notice-title">In your own school too</strong>
+            The app works with your school's school file. For that, your school sets up an environment of its own, once.
+            The app also works without a school: then a student practises on their own.
             What you need to use it in your own school, you read under
             <a href="#your-school">In your own school</a>.
           </p>
@@ -572,14 +573,15 @@
       </div>
     </section>
 
-    <!-- 6. In your own school: today Arcadia only; README; #261; an issue. -->
+    <!-- 6. In your own school: what a school sets up (README), stand-alone
+         (#261), the school file (#307), an issue. -->
     <section class="section" id="your-school" aria-labelledby="your-school-heading">
       <div class="wrap">
         <span class="section-label">In your own school</span>
         <h2 class="section-heading" id="your-school-heading">Can you use the app today?</h2>
         <p class="section-lead">
-          Not just like that. The app you download on this site only works with the school accounts of SMA Arcadia.
-          With an account from another school, you won't get past signing in.
+          Yes, once your school sets it up. The app you download on this site has no fixed school:
+          the school file says which school it works with. Without a school file, a student practises on their own.
         </p>
 
         <div class="card-grid">
@@ -587,10 +589,11 @@
             <div class="card-icon" aria-hidden="true">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 6.5a4 4 0 0 0-5 5L4 17v3h3l5.5-5.5a4 4 0 0 0 5-5L15 12l-3-3z" /></svg>
             </div>
-            <h3 class="card-title">Build it yourself</h3>
+            <h3 class="card-title">Setting up your school</h3>
             <p>
-              Want the app in your school now? Then you build your own version, with your school's Microsoft accounts, your own database and your own OpenAI account.
-              You don't have to write code, but you do work in the Azure portal and in PowerShell.
+              Your school needs an app registration in Microsoft Entra, a database of its own in Azure Cosmos DB and an OpenAI key of its own.
+              In the database you put the goals, the lessons and the instructions. An administrator gives the app consent in Microsoft Entra, and the students and the teachers their roles in the database.
+              You don't have to build your own version, nor write code. You do work in the Azure portal and in PowerShell.
             </p>
             <p><a href="https://github.com/yvanvds/AI-tutor-Python#readme">The README on GitHub</a> describes it step by step.</p>
           </article>
@@ -599,10 +602,11 @@
             <div class="card-icon card-icon-info" aria-hidden="true">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="2" /><path d="M8 20h8M12 16v4" /></svg>
             </div>
-            <h3 class="card-title">Without a school account</h3>
+            <h3 class="card-title">Without a school</h3>
             <p>
-              A version you can use without a school account is in preparation.
-              You can follow it in <a href="https://github.com/yvanvds/AI-tutor-Python/issues/261">#261 on GitHub</a>.
+              If a student picks <strong>Continue without a school</strong> at the first start, they practise on their own, with an OpenAI key of their own.
+              Everything stays on their pc: nobody else sees their progress.
+              The <strong>Teacher</strong> part, the <strong>Grade formula</strong> and <strong>My reports</strong> are not there then.
             </p>
           </article>
 
@@ -612,11 +616,11 @@
             </div>
             <h3 class="card-title">A school file</h3>
             <p>
-              In a coming version a school sets up the app with a school file: a small JSON file with the school's name, the tenant and client id of its app registration, and the address and name of its database.
+              A school sets up the app with a school file: a small JSON file with the school's name, the tenant and client id of its app registration, and the address and name of its database.
               It holds no keys or passwords. The school makes it once and hands it out, for example through its learning platform.
               At the first start the student picks the file and signs in.
             </p>
-            <p>Today only SMA Arcadia's setup exists. What another school has to set up itself is in the README.</p>
+            <p>The school's OpenAI key is in its own database. That way every school pays for its own use.</p>
           </article>
 
           <article class="card">
