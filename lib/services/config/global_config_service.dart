@@ -2,6 +2,7 @@ import 'package:ai_tutor_python/core/cosmos_client.dart';
 import 'package:ai_tutor_python/core/cosmos_doc_id.dart';
 import 'package:ai_tutor_python/core/cosmos_paths.dart';
 import 'package:ai_tutor_python/core/cosmos_safety.dart';
+import 'package:ai_tutor_python/services/auth/auth_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'global_config.dart';
@@ -22,8 +23,12 @@ class GlobalConfigService extends Notifier<GlobalConfig?> {
 
   CosmosContainer get _container => _containerOverride ?? CosmosPaths.config();
 
+  /// Polls `config/global` while someone is signed in, and stops at the
+  /// sign-out (#345): with the database on the sign-in a poll after it has
+  /// no token, and pushed the recovery screen over the sign-in screen.
   @override
   GlobalConfig? build() {
+    if (!ref.watch(signedInProvider)) return null;
     final sub = watchConfig().listen((cfg) => state = cfg);
     ref.onDispose(sub.cancel);
     return null;

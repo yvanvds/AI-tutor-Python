@@ -17,6 +17,7 @@
 import 'package:ai_tutor_python/features/session/widgets/objective_banner.dart';
 import 'package:ai_tutor_python/features/session/widgets/subgoal_progress_bar.dart';
 import 'package:ai_tutor_python/features/shell/top_bar.dart';
+import 'package:ai_tutor_python/services/auth/auth_service.dart';
 import 'package:ai_tutor_python/services/config/app_locale.dart';
 import 'package:ai_tutor_python/services/goal/goal.dart';
 import 'package:ai_tutor_python/services/goal/goal_selection_notifier.dart';
@@ -106,6 +107,8 @@ void main() {
         // second set of overrides.
         key: UniqueKey(),
         overrides: [
+          // The polled lists are read for someone signed in (#345).
+          signedInProvider.overrideWithValue(true),
           appLocaleProvider.overrideWithValue(locale),
           translationServiceProvider.overrideWithValue(
             TranslationService(

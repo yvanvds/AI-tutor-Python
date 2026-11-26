@@ -43,6 +43,7 @@ import 'dart:io';
 
 import 'package:ai_tutor_python/core/app_mode.dart';
 import 'package:ai_tutor_python/core/app_start.dart';
+import 'package:ai_tutor_python/core/browser_launcher.dart';
 import 'package:ai_tutor_python/core/cosmos_client.dart';
 import 'package:ai_tutor_python/core/curriculum_bundle.dart';
 import 'package:ai_tutor_python/core/local_cosmos_client.dart';
@@ -500,7 +501,9 @@ class AppHarness {
   /// partition their `language` names (#207).
   final Map<String, List<Map<String, dynamic>>> extraDocs;
 
-  /// Every URL the app asked the operating system to open (#57).
+  /// Every URL the app asked the operating system to open (#57): GitHub's
+  /// verification page, and the school's sign-in page (#345), whose answer a
+  /// flow then plays itself on the app's loopback address.
   ///
   /// The launcher is always replaced, in every flow: the production one hands
   /// a URL to Windows, which during a test run means a browser window opening

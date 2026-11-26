@@ -3,6 +3,7 @@
 // patches the cached list so the tree updates before the next poll.
 // Issue #206 — the lesson's translations move with it, in every language.
 
+import 'package:ai_tutor_python/services/auth/auth_service.dart';
 import 'package:ai_tutor_python/services/content/content.dart';
 import 'package:ai_tutor_python/services/content/content_service.dart';
 import 'package:ai_tutor_python/services/translation/translation.dart';
@@ -48,6 +49,8 @@ void main() {
     ]);
     container = ProviderContainer(
       overrides: [
+        // The polled lists are read for someone signed in (#345).
+        signedInProvider.overrideWithValue(true),
         contentServiceProvider.overrideWith(
           () => ContentService(container: cosmos.container),
         ),

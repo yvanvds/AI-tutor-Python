@@ -29,6 +29,11 @@ const Duration kCosmosPollInterval = Duration(seconds: 5);
 
 /// One-shot guard. On 401/403 routes to the recovery screen and rethrows;
 /// the caller's UI still sees the failure so it can render an error state.
+///
+/// Nobody signed in, with the database on the sign-in, is not one of them
+/// (#345, [CosmosException.isNotSignedIn]): after a sign-out the sign-in
+/// screen is where the user belongs, and the reset would only sign out
+/// again. It is rethrown like any other failure.
 Future<T> safeCosmos<T>(Future<T> Function() op) async {
   try {
     return await op();

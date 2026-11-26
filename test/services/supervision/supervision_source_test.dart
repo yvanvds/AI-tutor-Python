@@ -275,7 +275,17 @@ void main() {
     test(
       'is wired for a class once the polled list says it has lessons',
       () async {
-        boot();
+        // The list is polled for someone signed in (#345).
+        boot(
+          signedIn: const AccountIdentity(
+            oid: 'stu',
+            displayName: 'Stu Test',
+            email: 'stu@example.com',
+            firstName: 'Stu',
+            lastName: 'Test',
+            isTeacher: false,
+          ),
+        );
         final source = container.read(supervisionSourceProvider);
         // Not known yet: not wired.
         expect(source.isWiredFor('6EWI'), isFalse);

@@ -161,14 +161,17 @@ void main() {
     expect(tokens.renewals, 0);
   });
 
-  test('no token at all fails the call as an auth error before anything '
-      'is sent', () async {
+  test('no token at all fails the call before anything is sent, as nobody '
+      'signed in rather than an auth error (#345)', () async {
     var calls = 0;
     final client = CosmosClient.withHttpClient(
       endpoint: Uri.parse('https://example.documents.azure.com/'),
       auth: AadTokenAuth(
-        ({bool forceRefresh = false}) async =>
-            throw CosmosException(401, 'not signed in', code: 'NotSignedIn'),
+        ({bool forceRefresh = false}) async => throw CosmosException(
+          401,
+          'not signed in',
+          code: kCosmosNotSignedIn,
+        ),
       ),
       httpClient: MockClient((_) async {
         calls++;
@@ -180,7 +183,9 @@ void main() {
     await expectLater(
       client.container('goals').read('g1', partitionKey: 'goal'),
       throwsA(
-        isA<CosmosException>().having((e) => e.isAuthError, 'auth', isTrue),
+        isA<CosmosException>()
+            .having((e) => e.isNotSignedIn, 'not signed in', isTrue)
+            .having((e) => e.isAuthError, 'auth', isFalse),
       ),
     );
     expect(calls, 0);

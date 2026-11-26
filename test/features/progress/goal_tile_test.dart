@@ -5,6 +5,7 @@
 // page does.
 
 import 'package:ai_tutor_python/features/progress/goal_tile.dart';
+import 'package:ai_tutor_python/services/auth/auth_service.dart';
 import 'package:ai_tutor_python/services/config/app_locale.dart';
 import 'package:ai_tutor_python/services/goal/goal.dart';
 import 'package:ai_tutor_python/services/translation/translation.dart';
@@ -51,6 +52,8 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          // The polled lists are read for someone signed in (#345).
+          signedInProvider.overrideWithValue(true),
           appLocaleProvider.overrideWithValue(const Locale('en')),
           translationServiceProvider.overrideWithValue(
             TranslationService(container: store.container),

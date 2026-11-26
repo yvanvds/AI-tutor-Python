@@ -33,6 +33,7 @@ library;
 import 'package:ai_tutor_python/core/update_bootstrap.dart';
 import 'package:ai_tutor_python/core/update_controller.dart';
 import 'package:ai_tutor_python/core/update_info.dart';
+import 'package:ai_tutor_python/services/auth/auth_service.dart';
 import 'package:ai_tutor_python/services/config/global_config.dart';
 import 'package:ai_tutor_python/services/config/global_config_service.dart';
 import 'package:flutter/foundation.dart';
@@ -114,9 +115,15 @@ UpdateRequirement? evaluateUpdateRequirement({
 /// A read that fails is logged and treated as "go" — a Cosmos blip is not an
 /// old client, and the poll listener corrects the answer within one
 /// interval if there was a minimum after all.
+///
+/// Asked anew at every sign-in, and not at all while nobody is signed in
+/// (#345): the config is not polled then, so what it said before a sign-out
+/// is not known to hold at the next sign-in, which waits for the config
+/// again as the first one did.
 class UpdateRequirementController extends AsyncNotifier<UpdateRequirement?> {
   @override
   Future<UpdateRequirement?> build() async {
+    if (!ref.watch(signedInProvider)) return null;
     final String local = ref.watch(appVersionProvider);
 
     // Every later poll: a minimum the teacher raises while the app is open

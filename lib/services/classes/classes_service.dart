@@ -6,6 +6,7 @@ import 'package:ai_tutor_python/core/cosmos_client.dart';
 import 'package:ai_tutor_python/core/cosmos_doc_id.dart';
 import 'package:ai_tutor_python/core/cosmos_paths.dart';
 import 'package:ai_tutor_python/core/cosmos_safety.dart';
+import 'package:ai_tutor_python/services/auth/auth_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'school_class.dart';
@@ -60,8 +61,10 @@ class ClassesService extends Notifier<ClassList?> {
 
   CosmosContainer get _container => _containerOverride ?? CosmosPaths.config();
 
+  /// Polled while someone is signed in, like `config/global` (#345).
   @override
   ClassList? build() {
+    if (!ref.watch(signedInProvider)) return null;
     final sub = watchClasses().listen((classes) => state = classes);
     ref.onDispose(sub.cancel);
     return null;

@@ -5,6 +5,7 @@
 // and a class's lessons — weekday from a list, times from the time picker.
 
 import 'package:ai_tutor_python/features/classes/classes_page.dart';
+import 'package:ai_tutor_python/services/auth/auth_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -72,6 +73,8 @@ void main() {
     })..install();
     await tester.pumpWidget(
       ProviderScope(
+        // The polled lists are read for someone signed in (#345).
+        overrides: [signedInProvider.overrideWithValue(true)],
         child: localizedTestApp(
           const Scaffold(body: ClassesPage()),
           locale: locale,

@@ -94,6 +94,7 @@ import 'flows/restart_in_practice.dart' as restart_in_practice;
 import 'flows/run_shortcut.dart' as run_shortcut;
 import 'flows/session_narrow.dart' as session_narrow;
 import 'flows/sidebar_rail.dart' as sidebar_rail;
+import 'flows/sign_out_sign_in.dart' as sign_out_sign_in;
 import 'flows/status_report_retry.dart' as status_report_retry;
 import 'flows/stuck_advance_progress.dart' as stuck_advance_progress;
 import 'flows/stuck_own_questions.dart' as stuck_own_questions;
@@ -236,4 +237,5 @@ void main() {
   update_required.main();
   whats_new_overlay.main();
   app_mode.main();
+  sign_out_sign_in.main();
 }

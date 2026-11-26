@@ -7,6 +7,7 @@
 // with the editor selection set the way a click on a subgoal row sets it.
 
 import 'package:ai_tutor_python/features/goals/editor/edit_goal_panel.dart';
+import 'package:ai_tutor_python/services/auth/auth_service.dart';
 import 'package:ai_tutor_python/services/content/content.dart';
 import 'package:ai_tutor_python/services/content/content_service.dart';
 import 'package:ai_tutor_python/services/goal/goal.dart';
@@ -67,6 +68,8 @@ void main() {
     translations = InMemoryCosmos.partitioned('language');
     container = ProviderContainer(
       overrides: [
+        // The polled lists are read for someone signed in (#345).
+        signedInProvider.overrideWithValue(true),
         goalsServiceProvider.overrideWithValue(
           GoalsService(container: goals.container),
         ),

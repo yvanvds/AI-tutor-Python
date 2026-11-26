@@ -14,6 +14,7 @@ import 'package:ai_tutor_python/features/session/modes/explain_view.dart';
 import 'package:ai_tutor_python/features/session/viewed_content_state.dart';
 import 'package:ai_tutor_python/features/shell/shell_state.dart';
 import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
+import 'package:ai_tutor_python/services/auth/auth_service.dart';
 import 'package:ai_tutor_python/services/config/app_locale.dart';
 import 'package:ai_tutor_python/services/content/content_service.dart';
 import 'package:ai_tutor_python/services/goal/goal.dart';
@@ -128,6 +129,8 @@ void main() {
   });
 
   List<Override> overrides(Goal child, {Goal? rootGoal}) => [
+    // The polled lists are read for someone signed in (#345).
+    signedInProvider.overrideWithValue(true),
     goalSelectionProvider.overrideWith(
       () => _PresetSelection(rootGoal ?? root, child),
     ),

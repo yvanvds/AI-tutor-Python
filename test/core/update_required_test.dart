@@ -6,12 +6,14 @@
 
 import 'package:ai_tutor_python/core/update_bootstrap.dart';
 import 'package:ai_tutor_python/core/update_required.dart';
+import 'package:ai_tutor_python/services/auth/auth_service.dart';
 import 'package:ai_tutor_python/services/config/global_config.dart';
 import 'package:ai_tutor_python/services/config/global_config_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../helpers/in_memory_cosmos.dart';
+import '../helpers/switchable_auth.dart';
 
 /// The real config service over an in-memory container, plus a way to
 /// publish a value the way a poll would — without waiting five seconds for
@@ -102,6 +104,8 @@ void main() {
       config = InMemoryCosmos(docs);
       final container = ProviderContainer(
         overrides: [
+          // Asked only for someone signed in (#345).
+          authServiceProvider.overrideWith(SwitchableAuth.new),
           appVersionProvider.overrideWithValue(_local),
           globalConfigServiceProvider.overrideWith(
             () => _Configs(container: config.container),
@@ -174,6 +178,41 @@ void main() {
       expect(container.read(updateRequirementProvider).valueOrNull, isNull);
       expect(container.read(updateRequirementProvider).isLoading, isFalse);
     });
+
+    // #345: the config is not polled while nobody is signed in, so the next
+    // sign-in cannot go on what it said before the sign-out. It waits for
+    // the config again, as the first sign-in did.
+    test(
+      'asks nothing while signed out, and anew at the next sign-in',
+      () async {
+        final container = containerFor([_doc()]);
+        container.listen(updateRequirementProvider, (_, _) {});
+        expect(await container.read(updateRequirementProvider.future), isNull);
+        final auth = container.read(authServiceProvider.notifier);
+
+        await auth.signOut();
+        await container.pump();
+        // The minimum goes up while nobody is signed in on this pc.
+        config.upsert(_doc(minimum: '9.0.0'), partitionKey: 'config');
+        final readsSignedOut = config.reads;
+        expect(await container.read(updateRequirementProvider.future), isNull);
+        expect(config.reads, readsSignedOut, reason: 'read for nobody');
+
+        await auth.signIn();
+        expect(
+          container.read(updateRequirementProvider).isLoading,
+          isTrue,
+          reason: 'the sign-in went on the answer from before the sign-out',
+        );
+        expect(
+          await container.read(updateRequirementProvider.future),
+          const UpdateRequirement(
+            localVersion: _local,
+            minimumVersion: '9.0.0',
+          ),
+        );
+      },
+    );
   });
 }
 

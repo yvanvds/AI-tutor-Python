@@ -35,7 +35,6 @@ import 'dart:io';
 import 'package:ai_tutor_python/services/github/github_oauth_config.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
-import 'package:url_launcher/url_launcher.dart';
 
 /// The one scope the app asks for.
 ///
@@ -356,16 +355,4 @@ final gitHubDeviceFlowProvider = Provider<GitHubDeviceFlow>(
     clientId: ref.watch(gitHubOAuthClientIdProvider),
     authBase: ref.watch(gitHubOAuthBaseProvider),
   ),
-);
-
-/// Opening the student's browser at the verification URL.
-///
-/// A seam for the same reason `installerLauncherProvider` is one (#49): the
-/// production implementation hands a URL to the operating system, which in a
-/// test run means a real browser window on the machine running the suite.
-typedef BrowserLauncher = Future<bool> Function(Uri url);
-
-final browserLauncherProvider = Provider<BrowserLauncher>(
-  (_) =>
-      (Uri url) => launchUrl(url, mode: LaunchMode.externalApplication),
 );

@@ -11,6 +11,7 @@
 import 'package:ai_tutor_python/core/cosmos_safety.dart';
 import 'package:ai_tutor_python/features/session/widgets/objective_banner.dart';
 import 'package:ai_tutor_python/features/shell/shell_state.dart';
+import 'package:ai_tutor_python/services/auth/auth_service.dart';
 import 'package:ai_tutor_python/services/config/app_locale.dart';
 import 'package:ai_tutor_python/services/goal/goal.dart';
 import 'package:ai_tutor_python/services/goal/goal_selection_notifier.dart';
@@ -89,6 +90,8 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          // The polled lists are read for someone signed in (#345).
+          signedInProvider.overrideWithValue(true),
           appLocaleProvider.overrideWithValue(locale),
           translationServiceProvider.overrideWithValue(service),
           goalSelectionProvider.overrideWith(selection),

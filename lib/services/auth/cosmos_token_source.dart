@@ -68,8 +68,10 @@ class CosmosTokenSource {
   /// for more than [kCosmosTokenRenewMargin] and belongs to the sign-in
   /// stored now; otherwise, or with [forceRefresh], a new one.
   ///
-  /// Throws a 401 [CosmosException] when nobody is signed in or the sign-in
-  /// cannot give a token, so callers treat it like the database refusing.
+  /// Throws a 401 [CosmosException] when the sign-in cannot give a token, so
+  /// callers treat it like the database refusing. When nobody is signed in
+  /// — after a sign-out, say — the 401 is [CosmosException.isNotSignedIn]
+  /// instead (#345): no request, and no permission problem either.
   Future<String> token({bool forceRefresh = false}) async {
     final prefs = await SharedPreferences.getInstance();
     final stored = _readStored(prefs);
@@ -79,7 +81,7 @@ class CosmosTokenSource {
       throw CosmosException(
         401,
         'Not signed in: no sign-in to get a database token from.',
-        code: 'NotSignedIn',
+        code: kCosmosNotSignedIn,
       );
     }
     final cached = _cached;

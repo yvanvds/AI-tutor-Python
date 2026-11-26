@@ -10,6 +10,7 @@
 // The teacher's editors (#208) show and write translations in every
 // language, not only the app's: `languageTranslationsProvider(language)`.
 
+import 'package:ai_tutor_python/services/auth/auth_service.dart';
 import 'package:ai_tutor_python/services/config/app_locale.dart';
 import 'package:ai_tutor_python/services/content/content.dart';
 import 'package:ai_tutor_python/services/goal/goal.dart';
@@ -133,6 +134,10 @@ class TranslationsNotifier extends Notifier<LanguageTranslations> {
       appLocaleProvider.select((locale) => locale.languageCode),
     );
     if (language == kSourceLanguage) return const LanguageTranslations.source();
+    // Polled while someone is signed in, like `config/global` (#345); until
+    // then, not loaded.
+    final unread = LanguageTranslations(language: language);
+    if (!ref.watch(signedInProvider)) return unread;
 
     _followLanguage(
       ref,
@@ -140,7 +145,7 @@ class TranslationsNotifier extends Notifier<LanguageTranslations> {
       current: () => state,
       update: (next) => state = next,
     );
-    return LanguageTranslations(language: language);
+    return unread;
   }
 }
 

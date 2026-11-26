@@ -84,6 +84,10 @@ class InMemoryCosmos {
   /// the student's read and replace. It sees the id and the doc as sent.
   Future<void> Function(String id, Map<String, Object?> doc)? beforeReplace;
 
+  /// How many reads and queries went through [container]: what a test
+  /// counts polls by (#345).
+  int reads = 0;
+
   final Map<String, String> _etags = {};
   int _writes = 0;
 
@@ -244,7 +248,10 @@ class _InMemoryContainer implements CosmosContainer {
   Future<Map<String, dynamic>?> read(
     String id, {
     required Object partitionKey,
-  }) async => _store.read(id, partitionKey: partitionKey);
+  }) async {
+    _store.reads++;
+    return _store.read(id, partitionKey: partitionKey);
+  }
 
   @override
   Future<List<Map<String, dynamic>>> query(
@@ -252,12 +259,15 @@ class _InMemoryContainer implements CosmosContainer {
     Map<String, Object?> parameters = const {},
     Object? partitionKey,
     bool crossPartition = false,
-  }) async => _store.query(
-    sql,
-    parameters,
-    partitionKey: partitionKey,
-    crossPartition: crossPartition,
-  );
+  }) async {
+    _store.reads++;
+    return _store.query(
+      sql,
+      parameters,
+      partitionKey: partitionKey,
+      crossPartition: crossPartition,
+    );
+  }
 
   @override
   Future<Map<String, dynamic>> create(
@@ -320,6 +330,12 @@ class InMemoryCosmosClient implements CosmosClient {
   /// is set.
   final List<String> authorizations = [];
 
+  /// Every request the app tried while [auth] is set, in order, as
+  /// `'<verb> <container>'` — also the ones [auth] could give no header for,
+  /// which never reach [authorizations] (#345): a poll after a sign-out is
+  /// still a poll.
+  final List<String> requests = [];
+
   /// The containers whose ids are unique per partition rather than per
   /// container, with the doc field their partition key is read from.
   static const Map<String, String> _partitionedBy = {
@@ -353,7 +369,13 @@ class InMemoryCosmosClient implements CosmosClient {
     final auth = this.auth;
     return auth == null
         ? container
-        : _AuthorizedContainer(container, containerId, auth, authorizations);
+        : _AuthorizedContainer(
+            container,
+            containerId,
+            auth,
+            authorizations,
+            requests,
+          );
   }
 
   /// Routes every `CosmosPaths.*()` handle through this fake.
@@ -363,15 +385,23 @@ class InMemoryCosmosClient implements CosmosClient {
 /// [_inner], with an `Authorization` header asked of [_auth] before each
 /// request (see [InMemoryCosmosClient.auth]).
 class _AuthorizedContainer implements CosmosContainer {
-  _AuthorizedContainer(this._inner, this._id, this._auth, this._seen);
+  _AuthorizedContainer(
+    this._inner,
+    this._id,
+    this._auth,
+    this._seen,
+    this._tried,
+  );
 
   final CosmosContainer _inner;
   final String _id;
   final CosmosAuth _auth;
   final List<String> _seen;
+  final List<String> _tried;
 
   /// As the real client signs it: the verb, and the doc or the container.
   Future<void> _authorize(String verb, [String? docId]) async {
+    _tried.add('$verb $_id');
     final coll = 'dbs/in-memory/colls/$_id';
     _seen.add(
       await _auth.authHeader(

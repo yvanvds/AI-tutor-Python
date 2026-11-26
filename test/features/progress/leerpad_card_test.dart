@@ -34,6 +34,7 @@ import 'package:ai_tutor_python/core/cosmos_safety.dart';
 import 'package:ai_tutor_python/features/progress/widgets/leerpad_card.dart';
 import 'package:ai_tutor_python/features/progress/widgets/leerpad_child_chip.dart';
 import 'package:ai_tutor_python/features/progress/widgets/leerpad_objectives_panel.dart';
+import 'package:ai_tutor_python/services/auth/auth_service.dart';
 import 'package:ai_tutor_python/services/config/app_locale.dart';
 import 'package:ai_tutor_python/services/goal/goal.dart';
 import 'package:ai_tutor_python/services/goal/learning_objective.dart';
@@ -117,6 +118,8 @@ Widget _card(
   String? pickedUpChildId,
 }) => ProviderScope(
   overrides: [
+    // The polled lists are read for someone signed in (#345).
+    signedInProvider.overrideWithValue(true),
     appLocaleProvider.overrideWithValue(locale),
     translationServiceProvider.overrideWithValue(
       translations ??

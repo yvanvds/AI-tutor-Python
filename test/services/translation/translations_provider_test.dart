@@ -11,6 +11,7 @@ import 'dart:ui';
 
 import 'package:ai_tutor_python/core/cosmos_client.dart';
 import 'package:ai_tutor_python/core/cosmos_safety.dart';
+import 'package:ai_tutor_python/services/auth/auth_service.dart';
 import 'package:ai_tutor_python/services/config/app_locale.dart';
 import 'package:ai_tutor_python/services/content/content.dart';
 import 'package:ai_tutor_python/services/goal/goal.dart';
@@ -84,6 +85,8 @@ void main() {
   }) {
     final container = ProviderContainer(
       overrides: [
+        // The polled lists are read for someone signed in (#345).
+        signedInProvider.overrideWithValue(true),
         _locale.overrideWith((_) => locale),
         appLocaleProvider.overrideWith((ref) => ref.watch(_locale)),
         translationServiceProvider.overrideWithValue(
@@ -304,6 +307,8 @@ void main() {
     fakeAsync((async) {
       final container = ProviderContainer(
         overrides: [
+          // The polled lists are read for someone signed in (#345).
+          signedInProvider.overrideWithValue(true),
           appLocaleProvider.overrideWithValue(const Locale('en')),
           translationServiceProvider.overrideWithValue(
             TranslationService(container: cosmos.container),
@@ -336,6 +341,8 @@ void main() {
     }) {
       final container = ProviderContainer(
         overrides: [
+          // The polled lists are read for someone signed in (#345).
+          signedInProvider.overrideWithValue(true),
           appLocaleProvider.overrideWithValue(locale),
           translationServiceProvider.overrideWithValue(
             TranslationService(container: translations),

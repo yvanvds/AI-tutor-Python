@@ -15,6 +15,7 @@
 import 'package:ai_tutor_python/core/cosmos_safety.dart';
 import 'package:ai_tutor_python/features/session/modes/explain_view.dart';
 import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
+import 'package:ai_tutor_python/services/auth/auth_service.dart';
 import 'package:ai_tutor_python/services/config/app_locale.dart';
 import 'package:ai_tutor_python/services/content/content.dart';
 import 'package:ai_tutor_python/services/content/content_service.dart';
@@ -142,6 +143,8 @@ void main() {
 
   Widget app(Locale locale, {bool cached = true}) => ProviderScope(
     overrides: [
+      // The polled lists are read for someone signed in (#345).
+      signedInProvider.overrideWithValue(true),
       _locale.overrideWith((_) => locale),
       appLocaleProvider.overrideWith((ref) => ref.watch(_locale)),
       translationServiceProvider.overrideWithValue(service),
