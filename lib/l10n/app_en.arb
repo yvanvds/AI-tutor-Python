@@ -2111,6 +2111,21 @@
   "firstStart_schoolHint": "Then you sign in with your school account.",
   "firstStart_without": "Continue without a school",
   "firstStart_withoutHint": "You practise on your own, with your own OpenAI key. Everything stays on this pc.",
+  "contentLoading_title": "Loading the content…",
+  "contentLoading_count": "{written} of {total}",
+  "@contentLoading_count": {
+    "placeholders": {
+      "written": {"type": "int"},
+      "total": {"type": "int"}
+    }
+  },
+  "contentLoading_hint": "The lessons and exercises are put on this pc.",
+  "contentLoading_failed": "The app could not start: {error}",
+  "@contentLoading_failed": {
+    "placeholders": {
+      "error": {"type": "String"}
+    }
+  },
   "schoolFile_error_unreadable": "The file could not be read. Nothing has changed.",
   "schoolFile_error_notASchoolFile": "This is not a school file. Nothing has changed.",
   "schoolFile_error_newerFormat": "This school file is for a newer version of the app. Update the app and try again. Nothing has changed.",

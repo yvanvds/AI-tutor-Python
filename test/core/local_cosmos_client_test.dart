@@ -302,6 +302,63 @@ void main() {
       expect(localStorageSafeName('Ab'), isNot(localStorageSafeName('ab')));
       expect(localStorageSafeName('x' * 300).length, lessThanOrEqualTo(80));
     });
+
+    test('upsertAll writes many docs as upsert does: each to its own file, '
+        'stamped, there again on the next start (#346)', () async {
+      final client = open();
+      final docs = [
+        for (var i = 0; i < 40; i++)
+          (
+            doc: belief('b$i', uid: 'u${i % 3}', n: i),
+            partitionKey: 'u${i % 3}',
+          ),
+        // The same doc twice: the last one counts.
+        (doc: belief('b0', uid: 'u0', n: 99), partitionKey: 'u0'),
+      ];
+      var written = 0;
+      await client.upsertAll('lo_beliefs', docs, onWritten: () => written++);
+
+      expect(written, 40);
+      final c = client.container('lo_beliefs');
+      final b0 = (await c.read('b0', partitionKey: 'u0'))!;
+      expect(b0['n'], 99);
+      expect(b0['_etag'], isA<String>());
+      expect(b0['_ts'], isA<int>());
+      final dir = Directory(p.join(root.path, 'lo_beliefs'));
+      final files = dir
+          .listSync(recursive: true)
+          .whereType<File>()
+          .map((f) => p.relative(f.path, from: dir.path))
+          .toSet();
+      expect(files, hasLength(40));
+      expect(files, contains(p.join('u1', 'b1.json')));
+      expect(files.where((f) => f.endsWith('.tmp')), isEmpty);
+
+      final reopened = open().container('lo_beliefs');
+      final all = await reopened.query('SELECT * FROM c', crossPartition: true);
+      expect(all, hasLength(40));
+      expect((await reopened.read('b0', partitionKey: 'u0'))!['n'], 99);
+      expect((await reopened.read('b7', partitionKey: 'u1'))!['n'], 7);
+    });
+
+    test('upsertAll checks every doc first: a wrong partition key writes '
+        'nothing', () async {
+      final client = open();
+      await expectLater(
+        client.upsertAll('lo_beliefs', [
+          (doc: belief('b1'), partitionKey: 'u1'),
+          (doc: belief('b2', uid: 'u2'), partitionKey: 'u1'),
+        ]),
+        _status(400),
+      );
+      expect(
+        await client
+            .container('lo_beliefs')
+            .query('SELECT * FROM c', crossPartition: true),
+        isEmpty,
+      );
+      expect(Directory(p.join(root.path, 'lo_beliefs')).existsSync(), isFalse);
+    });
   });
 
   group('the app mode', () {

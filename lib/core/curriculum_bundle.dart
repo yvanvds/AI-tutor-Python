@@ -19,15 +19,23 @@
 //   - everything else (`accounts`, `lo_beliefs`, `progress`, `turn_history`,
 //     `playground_files`, …) is never touched, whatever the bundle holds.
 //
-// The same bundle again writes nothing. No bundle (a folder without a
-// manifest) installs nothing and leaves whatever was loaded before. The
-// school mode never calls this: its content is the school's database.
+// The same bundle again writes nothing. A new one writes only the docs that
+// changed: a doc stored just as the bundle has it is left alone (#346). No
+// bundle (a folder without a manifest) installs nothing and leaves whatever
+// was loaded before. The school mode never calls this: its content is the
+// school's database.
+//
+// The first start writes every doc, each to its own file (#263): on the
+// local storage through `LocalCosmosClient.upsertAll`, asynchronously and
+// several at a time, so the window keeps painting the loading page and its
+// progress ([CurriculumProgress]) meanwhile (#346).
 
 import 'dart:convert';
 import 'dart:io';
 
 import 'package:ai_tutor_python/core/cosmos_client.dart';
 import 'package:ai_tutor_python/core/local_cosmos_client.dart';
+import 'package:collection/collection.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
@@ -171,17 +179,24 @@ enum CurriculumInstall {
   installed,
 }
 
+/// How far [installCurriculumBundle] is: [written] of the [total] docs it
+/// writes. Called with `written == 0` before the first write, then after
+/// every doc; not at all when there is nothing to write.
+typedef CurriculumProgress = void Function(int written, int total);
+
 /// The file that keeps which bundle the local storage holds, inside the
 /// stand-alone data folder: deleting that folder loads the bundle afresh.
 File curriculumVersionFile(Directory localDataRoot) =>
     File(p.join(localDataRoot.path, 'curriculum_bundle.json'));
 
 /// Writes [source]'s bundle to [client] when it is not the one loaded last
-/// (see the top of this file). Stand-alone mode only.
+/// (see the top of this file), telling [onProgress] how far it is.
+/// Stand-alone mode only.
 Future<CurriculumInstall> installCurriculumBundle({
   required CurriculumBundleSource source,
   required CosmosClient client,
   required File versionFile,
+  CurriculumProgress? onProgress,
 }) async {
   final bundle = await CurriculumBundle.read(source);
   if (bundle == null) return CurriculumInstall.noBundle;
@@ -189,42 +204,73 @@ Future<CurriculumInstall> installCurriculumBundle({
     return CurriculumInstall.upToDate;
   }
 
+  // What goes and what is written, per container, before anything changes.
+  final plans = <_ContainerPlan>[];
   for (final entry in bundle.docs.entries) {
     final name = entry.key;
     final field = kCosmosPartitionKeyFields[name]!;
-    final container = client.container(name);
-    final incoming = entry.value;
+    final incoming = [
+      for (final d in entry.value)
+        if (name != 'config' || kBundleConfigIds.contains(d['id'])) d,
+    ];
     if (name == 'questions') {
       for (final d in incoming) {
         d[kFromBundleField] = true;
       }
     }
-    final keep = {for (final d in incoming) _keyOf(d, field)};
 
-    final stored = await container.query(
-      'SELECT * FROM c',
-      crossPartition: true,
-    );
-    for (final d in stored) {
-      if (keep.contains(_keyOf(d, field))) continue;
-      final owned = switch (name) {
-        'config' => kBundleConfigIds.contains(d['id']),
-        'questions' => d[kFromBundleField] == true,
-        _ => true,
-      };
-      if (!owned) continue;
+    final stored = {
+      for (final d
+          in await client
+              .container(name)
+              .query('SELECT * FROM c', crossPartition: true))
+        _keyOf(d, field): d,
+    };
+    final keep = {for (final d in entry.value) _keyOf(d, field)};
+    final gone = [
+      for (final MapEntry(:key, value: d) in stored.entries)
+        if (!keep.contains(key) &&
+            switch (name) {
+              'config' => kBundleConfigIds.contains(d['id']),
+              'questions' => d[kFromBundleField] == true,
+              _ => true,
+            })
+          d,
+    ];
+    final changed = [
+      for (final d in incoming)
+        if (!_sameContent(stored[_keyOf(d, field)], d)) d,
+    ];
+    plans.add(_ContainerPlan(name, field, gone: gone, changed: changed));
+  }
+
+  final total = plans.fold(0, (n, plan) => n + plan.changed.length);
+  var written = 0;
+  if (total > 0) onProgress?.call(0, total);
+  void wrote() => onProgress?.call(++written, total);
+  for (final _ContainerPlan(:name, :field, :gone, :changed) in plans) {
+    final container = client.container(name);
+    for (final d in gone) {
       await container.delete(d['id'] as String, partitionKey: d[field]);
     }
-    for (final d in incoming) {
-      if (name == 'config' && !kBundleConfigIds.contains(d['id'])) continue;
-      await container.upsert(d, partitionKey: d[field] as Object);
+    if (client is LocalCosmosClient) {
+      await client.upsertAll(name, [
+        for (final d in changed) (doc: d, partitionKey: d[field] as Object),
+      ], onWritten: wrote);
+    } else {
+      for (final d in changed) {
+        await container.upsert(d, partitionKey: d[field] as Object);
+        wrote();
+      }
     }
   }
 
-  // Last, so a start that stopped half way loads the bundle again.
-  versionFile.parent.createSync(recursive: true);
-  versionFile.writeAsStringSync(
+  // Last, so a start that stopped half way loads the bundle again; what it
+  // wrote before it stopped is then left alone.
+  await versionFile.parent.create(recursive: true);
+  await versionFile.writeAsString(
     jsonEncode({'contentVersion': bundle.contentVersion}),
+    flush: true,
   );
   return CurriculumInstall.installed;
 }
@@ -236,17 +282,48 @@ Future<CurriculumInstall?> installCurriculumBundleAtStart({
   required CosmosClient client,
   required Directory localDataRoot,
   CurriculumBundleSource? source,
+  CurriculumProgress? onProgress,
 }) async {
   try {
     return await installCurriculumBundle(
       source: source ?? AssetCurriculumBundleSource(),
       client: client,
       versionFile: curriculumVersionFile(localDataRoot),
+      onProgress: onProgress,
     );
   } on Object catch (e, st) {
     debugPrint('Curriculum bundle not loaded: $e\n$st');
     return null;
   }
+}
+
+/// What [installCurriculumBundle] does to one container: the stored docs
+/// that go, and the bundle's docs that are new or changed.
+class _ContainerPlan {
+  _ContainerPlan(
+    this.name,
+    this.field, {
+    required this.gone,
+    required this.changed,
+  });
+
+  final String name;
+
+  /// The container's partition key field.
+  final String field;
+  final List<Map<String, dynamic>> gone;
+  final List<Map<String, dynamic>> changed;
+}
+
+/// Whether [stored] holds just what the bundle's [doc] holds: the storage's
+/// own fields (`_etag`, `_ts`, ...) aside.
+bool _sameContent(Map<String, dynamic>? stored, Map<String, dynamic> doc) {
+  if (stored == null) return false;
+  Map<String, dynamic> own(Map<String, dynamic> d) => {
+    for (final MapEntry(:key, :value) in d.entries)
+      if (!key.startsWith('_')) key: value,
+  };
+  return const DeepCollectionEquality().equals(own(stored), own(doc));
 }
 
 String _keyOf(Map<String, dynamic> d, String field) =>

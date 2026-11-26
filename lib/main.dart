@@ -9,6 +9,7 @@ import 'package:ai_tutor_python/core/update_required.dart';
 import 'package:ai_tutor_python/crash_recovery_screen.dart';
 import 'package:ai_tutor_python/features/school/first_start_page.dart';
 import 'package:ai_tutor_python/features/shell/app_shell.dart';
+import 'package:ai_tutor_python/features/standalone/content_loading_page.dart';
 import 'package:ai_tutor_python/features/standalone/standalone_welcome_page.dart';
 import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
 import 'package:ai_tutor_python/services/account/account_service.dart';
@@ -58,7 +59,16 @@ Future<void> main() async {
     build: build,
     prefs: prefs,
   );
-  if (mode != null) {
+  if (mode is StandaloneMode) {
+    // Stand-alone (#346): the window first, with the loading page; the local
+    // storage and the content it ships with after the first frame.
+    runApp(
+      UncontrolledProviderScope(
+        container: ProviderContainer(),
+        child: StandaloneStartApp(mode: mode, boot: bootApp),
+      ),
+    );
+  } else if (mode != null) {
     final container = await bootApp(mode);
     runApp(
       UncontrolledProviderScope(container: container, child: const GoalsApp()),
@@ -73,15 +83,26 @@ Future<void> main() async {
   }
 }
 
-/// The app's container for [mode], ready for the first frame: the data
-/// behind `CosmosClient.instance`, and the stored sign-in or local profile.
-Future<ProviderContainer> bootApp(AppMode mode) async {
+/// Boots the app in a mode: its container, as [bootApp] makes it. A
+/// stand-alone boot tells the [CurriculumProgress] how far the content is.
+typedef AppBoot = Future<ProviderContainer> Function(
+  AppMode mode,
+  CurriculumProgress? onProgress,
+);
+
+/// The app's container for [mode], ready for the app's first screen: the
+/// data behind `CosmosClient.instance`, and the stored sign-in or local
+/// profile. Stand-alone, [onProgress] hears how far the content is (#346).
+Future<ProviderContainer> bootApp(
+  AppMode mode, [
+  CurriculumProgress? onProgress,
+]) async {
   final container = ProviderContainer(
     overrides: [appModeProvider.overrideWithValue(mode)],
   );
   if (mode is StandaloneMode) {
-    // Stand-alone (#263): the data lives on the pc. Opened before the first
-    // frame, so every `CosmosPaths` handle reads the local storage.
+    // Stand-alone (#263): the data lives on the pc. Opened before the app's
+    // first screen, so every `CosmosPaths` handle reads the local storage.
     final dataRoot = await standaloneDataDir(mode);
     final client = CosmosClient.forMode(mode, localDataRoot: dataRoot);
     CosmosClient.overrideInstance(client);
@@ -90,6 +111,7 @@ Future<ProviderContainer> bootApp(AppMode mode) async {
     await installCurriculumBundleAtStart(
       client: client,
       localDataRoot: dataRoot,
+      onProgress: onProgress,
     );
   } else {
     // The school's database: the build's or the school file's (#307). A
@@ -104,11 +126,12 @@ Future<ProviderContainer> bootApp(AppMode mode) async {
 }
 
 /// The first start without a decided mode (#307): the choice, then the app
-/// in the chosen mode, booted by [boot] as `main()` boots it.
+/// in the chosen mode, booted by [boot] as `main()` boots it — without a
+/// school through [StandaloneStartApp], with its loading page (#346).
 class FirstStartApp extends ConsumerStatefulWidget {
   const FirstStartApp({super.key, required this.boot});
 
-  final Future<ProviderContainer> Function(AppMode mode) boot;
+  final AppBoot boot;
 
   @override
   ConsumerState<FirstStartApp> createState() => _FirstStartAppState();
@@ -116,14 +139,93 @@ class FirstStartApp extends ConsumerStatefulWidget {
 
 class _FirstStartAppState extends ConsumerState<FirstStartApp> {
   ProviderContainer? _app;
+  AppMode? _standalone;
 
   Future<void> _start(AppMode mode) async {
-    final app = await widget.boot(mode);
+    if (mode is StandaloneMode) {
+      setState(() => _standalone = mode);
+      return;
+    }
+    final app = await widget.boot(mode, null);
     if (!mounted) {
       app.dispose();
       return;
     }
     setState(() => _app = app);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final app = _app;
+    if (app != null) {
+      return UncontrolledProviderScope(container: app, child: const GoalsApp());
+    }
+    final standalone = _standalone;
+    if (standalone != null) {
+      return StandaloneStartApp(mode: standalone, boot: widget.boot);
+    }
+    final locale = ref.watch(appLocaleProvider);
+    final palette = ref.watch(appPaletteProvider);
+    AppColors.use(palette);
+    return MaterialApp(
+      onGenerateTitle: (context) => AppLocalizations.of(context).appTitle,
+      theme: buildAppTheme(palette),
+      locale: locale,
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      home: FirstStartPage(onChosen: _start),
+    );
+  }
+}
+
+/// A stand-alone start (#346): the window paints [ContentLoadingPage] first,
+/// and [boot] runs after that first frame — opening the local storage and
+/// loading the content it ships with, which on a first start writes every
+/// lesson and exercise to the pc. The page shows how far that is; then the
+/// app.
+class StandaloneStartApp extends ConsumerStatefulWidget {
+  const StandaloneStartApp({super.key, required this.mode, required this.boot});
+
+  final AppMode mode;
+  final AppBoot boot;
+
+  @override
+  ConsumerState<StandaloneStartApp> createState() => _StandaloneStartAppState();
+}
+
+class _StandaloneStartAppState extends ConsumerState<StandaloneStartApp> {
+  final _progress = ValueNotifier<ContentLoadProgress?>(null);
+  ProviderContainer? _app;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _start());
+  }
+
+  Future<void> _start() async {
+    final ProviderContainer app;
+    try {
+      app = await widget.boot(widget.mode, (written, total) {
+        if (mounted) _progress.value = (written: written, total: total);
+      });
+    } on Object catch (e, st) {
+      debugPrint('Stand-alone start failed: $e\n$st');
+      if (mounted) setState(() => _error = '$e');
+      return;
+    }
+    if (!mounted) {
+      app.dispose();
+      return;
+    }
+    setState(() => _app = app);
+  }
+
+  @override
+  void dispose() {
+    _progress.dispose();
+    super.dispose();
   }
 
   @override
@@ -141,7 +243,7 @@ class _FirstStartAppState extends ConsumerState<FirstStartApp> {
       locale: locale,
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
-      home: FirstStartPage(onChosen: _start),
+      home: ContentLoadingPage(progress: _progress, error: _error),
     );
   }
 }

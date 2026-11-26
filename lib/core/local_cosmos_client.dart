@@ -16,7 +16,9 @@
 // A write goes to `<id>.json.tmp` first and is then renamed over the old
 // file, so a crash mid-write leaves the old document or the new one, never a
 // broken file. An exercise writes a handful of small files and never one big
-// file again.
+// file again. Many docs at once (the content bundle at start, #346) go
+// through [LocalCosmosClient.upsertAll]: the same files, written
+// asynchronously, several at a time.
 //
 // [LocalCosmosClient.open] reads everything once; after that every read and
 // query is served from memory and every write goes to memory and disk.
@@ -89,7 +91,8 @@ class LocalCosmosClient implements CosmosClient {
   /// a client that serves them. Expired docs and files left behind by an
   /// interrupted write are removed on the way.
   ///
-  /// Reads synchronously: it runs once, at start, before the first frame.
+  /// Reads synchronously: it runs once, at start, before the app's first
+  /// screen (in `main()`, behind the loading page, #346).
   factory LocalCosmosClient.open(
     Directory root, {
     DateTime Function() clock = DateTime.now,
@@ -137,7 +140,35 @@ class LocalCosmosClient implements CosmosClient {
   /// [container], typed. Each folder under [root] is a container's name.
   _LocalContainer _containerFor(String containerId) =>
       container(containerId) as _LocalContainer;
+
+  /// Upserts [docs] into [containerId] as [CosmosContainer.upsert] does —
+  /// each doc to its own file, through `<id>.json.tmp`, flushed — but with
+  /// asynchronous writes, [parallel] files at a time. For loading many docs
+  /// at once (the content bundle at start, #346): the UI isolate is not held
+  /// up while the files are written, and the disk is kept busy.
+  ///
+  /// Every doc is checked before anything is written; of two docs with the
+  /// same id and partition key, the last one counts. [onWritten] is called
+  /// after each doc has landed on disk and in memory. A failed write throws
+  /// (500) once the writes under way are done, and can leave part of [docs]
+  /// written, as a crash in [CosmosContainer.executeBatch] can. Nothing else
+  /// may write to the container meanwhile.
+  Future<void> upsertAll(
+    String containerId,
+    List<({Map<String, Object?> doc, Object partitionKey})> docs, {
+    int parallel = 16,
+    void Function()? onWritten,
+  }) =>
+      _containerFor(containerId)
+          ._upsertAll(docs, parallel: parallel, onWritten: onWritten);
 }
+
+/// A doc [LocalCosmosClient.upsertAll] is about to write, and where.
+typedef _PlannedWrite = ({
+  File file,
+  Object partitionKey,
+  Map<String, Object?> doc,
+});
 
 class _Entry {
   _Entry(this.partitionKey, this.doc)
@@ -283,6 +314,29 @@ class _LocalContainer implements CosmosContainer {
     }
   }
 
+  /// [_writeFile], without blocking the isolate.
+  Future<void> _writeFileAsync(
+    File file,
+    Object? partitionKey,
+    Map<String, dynamic> doc,
+  ) async {
+    final tmp = File('${file.path}.tmp');
+    try {
+      await tmp.writeAsString(
+        jsonEncode({'partitionKey': partitionKey, 'doc': doc}),
+        flush: true,
+      );
+      await tmp.rename(file.path);
+    } on FileSystemException catch (e) {
+      _tryDelete(tmp);
+      throw CosmosException(
+        500,
+        'Could not write ${file.path}: ${e.message}',
+        code: 'LocalWriteFailed',
+      );
+    }
+  }
+
   void _deleteFile(Object? partitionKey, String id) {
     final file = _fileFor(partitionKey, id);
     try {
@@ -307,6 +361,56 @@ class _LocalContainer implements CosmosContainer {
     _writeFile(partitionKey, stamped);
     _docs[key] = _Entry(partitionKey, stamped);
     return _copy(stamped);
+  }
+
+  /// See [LocalCosmosClient.upsertAll].
+  Future<void> _upsertAll(
+    List<({Map<String, Object?> doc, Object partitionKey})> docs, {
+    required int parallel,
+    void Function()? onWritten,
+  }) async {
+    final planned = <String, _PlannedWrite>{};
+    for (final (:doc, :partitionKey) in docs) {
+      _checkPartition(doc, partitionKey);
+      final id = _idOf(doc);
+      planned[_key(partitionKey, id)] = (
+        file: _fileFor(partitionKey, id),
+        partitionKey: partitionKey,
+        doc: doc,
+      );
+    }
+    // The folders first, one at a time: two writers making the same folder
+    // at once can trip over each other.
+    for (final folder in {for (final w in planned.values) w.file.parent.path}) {
+      try {
+        await Directory(folder).create(recursive: true);
+      } on FileSystemException catch (e) {
+        throw CosmosException(
+          500,
+          'Could not make $folder: ${e.message}',
+          code: 'LocalWriteFailed',
+        );
+      }
+    }
+
+    final queue = planned.entries.iterator;
+    var failed = false;
+    Future<void> writer() async {
+      while (!failed && queue.moveNext()) {
+        final MapEntry(:key, value: w) = queue.current;
+        final stamped = _stamp(w.doc);
+        try {
+          await _writeFileAsync(w.file, w.partitionKey, stamped);
+        } on Object {
+          failed = true;
+          rethrow;
+        }
+        _docs[key] = _Entry(w.partitionKey, stamped);
+        onWritten?.call();
+      }
+    }
+
+    await Future.wait([for (var i = 0; i < parallel; i++) writer()]);
   }
 
   // --- CosmosContainer -------------------------------------------------------
