@@ -854,9 +854,10 @@ class TutorService extends Notifier<TutorState> {
     // A follow-up still open lapses (#340): the question coming now is the
     // one in front of the student, and what they answer is the answer to
     // it — with its own plan, level, ID and moment, and a place in the bank.
-    // "Volgende" under a quiz, or code sent from the editor next to a
-    // follow-up, asked for it; the follow-up used to stay open, and the
-    // answer to this question was recorded as the follow-up's.
+    // "Volgende" under a quiz asked for it; the follow-up used to stay
+    // open, and the answer to this question was recorded as the
+    // follow-up's. (Code sent from the editor next to a follow-up answers
+    // it since #349, as the chat does: [submitCode].)
     final lapsed = _followUpInFlight;
     if (lapsed != null) {
       _followUpInFlight = null;
@@ -895,10 +896,11 @@ class TutorService extends Notifier<TutorState> {
         // Only ever the pick on the quiz: text typed in the chat while it
         // is open is a question, never its answer (#271).
         _answerInFlight = TurnContentAnswer(picked: prompt);
-      case ChatRequestType.explainAnswer ||
-          ChatRequestType.socraticFeedback ||
-          ChatRequestType.followUpAnswer:
+      case ChatRequestType.explainAnswer || ChatRequestType.socraticFeedback:
         _answerInFlight = TurnContentAnswer(text: prompt);
+      case ChatRequestType.followUpAnswer:
+        // Typed in the chat, or handed in from the editor (#349).
+        _answerInFlight = TurnContentAnswer(text: prompt, code: code);
       case ChatRequestType.requestHint:
         _hintsAsked += 1;
       default:
@@ -1047,13 +1049,14 @@ class TutorService extends Notifier<TutorState> {
         );
 
       case ChatRequestType.followUpAnswer:
-        if (prompt == null) return null;
+        if (prompt == null && code == null) return null;
         final fu = _followUpInFlight;
         if (fu == null) return null;
         return _RequestInput(
           QuestionFormatter.followUpAnswer(
             followUpQuestion: fu.question.question,
             studentAnswer: prompt,
+            code: code,
             rationale: fu.question.rationale,
             chainDepth: fu.depth,
             targetLOs: fu.originalPlan.targetLOs,
@@ -1977,10 +1980,8 @@ class TutorService extends Notifier<TutorState> {
     }
     final type = _practiceMessageType;
     if (type == ChatRequestType.followUpAnswer) {
-      // Synthetic plan so the grader landing reuses the original probe's
-      // target LO and gets the difficulty field. Conductor will treat the
-      // grading as follow-up via the `_followUpInFlight != null` flag.
-      _inFlightPlan = _followUpInFlight!.originalPlan;
+      await _answerFollowUp(prompt: message);
+      return;
     }
     await queryTutor(type: type, prompt: message);
   }
@@ -1989,8 +1990,38 @@ class TutorService extends Notifier<TutorState> {
     await queryTutor(type: ChatRequestType.requestHint, code: code);
   }
 
+  /// The code in the editor, sent with "Stuur naar tutor": the answer to
+  /// the code exercise in flight — or, while a follow-up is open, to that
+  /// follow-up (#349). A follow-up like "how would you change the code so
+  /// that…" is answered in the editor as naturally as in the chat, and the
+  /// code went out as `submit_code` without a plan: graded, recorded
+  /// nowhere, its cost on the next exercise's record, and the next exercise
+  /// asked for. It goes out as the chat's answer does now, and the
+  /// follow-up's record has the code as its answer.
   Future<void> submitCode(String code) async {
+    if (_followUpInFlight != null) {
+      await _answerFollowUp(code: code);
+      return;
+    }
     await queryTutor(type: ChatRequestType.submitCode, code: code);
+  }
+
+  /// Grades the answer to the follow-up in flight — typed in the chat
+  /// ([prompt]) or handed in from the editor ([code], #349) — as a
+  /// `follow_up_answer`. Not while the tutor is busy: the call would not
+  /// go out, and the plan must not move under the call that is.
+  Future<void> _answerFollowUp({String? prompt, String? code}) async {
+    final followUp = _followUpInFlight;
+    if (followUp == null || state != TutorState.idle) return;
+    // Synthetic plan so the grader landing reuses the original probe's
+    // target LO and gets the difficulty field. Conductor will treat the
+    // grading as follow-up via the `_followUpInFlight != null` flag.
+    _inFlightPlan = followUp.originalPlan;
+    await queryTutor(
+      type: ChatRequestType.followUpAnswer,
+      prompt: prompt,
+      code: code,
+    );
   }
 
   /// Public entry (PracticeView mount, "Volgende" after an MCQ). The

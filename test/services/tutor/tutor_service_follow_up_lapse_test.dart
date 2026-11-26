@@ -2,13 +2,12 @@
 // lapses: the answer to that question is the answer to it, not the
 // follow-up's.
 //
-// A follow-up is answered in the chat. Two ways put a new question up
-// before that, and the follow-up used to stay open through them:
-//
-// - "Volgende" under a quiz whose grade asked a follow-up
-//   (`advanceFromMcq` → `requestExercise`);
-// - code sent from the editor next to a follow-up of a code exercise: its
-//   grade has no plan to be recorded on and asks for the next exercise.
+// A follow-up is answered in the chat. "Volgende" under a quiz whose grade
+// asked a follow-up (`advanceFromMcq` → `requestExercise`) puts a new
+// question up before that, and the follow-up used to stay open through it.
+// So did code sent from the editor next to a follow-up of a code exercise,
+// until #349: its grade had no plan to be recorded on and asked for the
+// next exercise.
 //
 // The answer to the new question was then graded and recorded as the
 // follow-up: `isFollowUp`, capped at weak, no `questionId`, the follow-up's
@@ -17,6 +16,13 @@
 // follow-up's answer, on the old question's plan. Now the new question
 // keeps its own plan, ID, moment and place in the bank; a follow-up
 // answered in the chat while it is open stays a follow-up.
+//
+// #349 — code sent from the editor while a follow-up is open is the answer
+// to that follow-up, as the chat's is: a `follow_up_answer` with the
+// follow-up and the code, on the question's plan, recorded as the
+// follow-up with the code as its answer and the cost of its grading. It
+// was graded as `submit_code` without a plan: recorded nowhere, its cost
+// on the next exercise's record.
 //
 // The real `TutorService`, the real `TurnContentService` and
 // `QuestionBankService` over in-memory containers; the connector replays
@@ -29,6 +35,7 @@ import 'dart:convert';
 import 'package:ai_tutor_python/core/answer_quality.dart';
 import 'package:ai_tutor_python/core/chat_request_type.dart';
 import 'package:ai_tutor_python/core/question_difficulty.dart';
+import 'package:ai_tutor_python/core/token_usage.dart';
 import 'package:ai_tutor_python/features/shell/shell_state.dart';
 import 'package:ai_tutor_python/services/auth/auth_service.dart';
 import 'package:ai_tutor_python/services/chat/chat_notice.dart';
@@ -76,8 +83,10 @@ class _Connector extends OpenaiConnector {
   final List<List<StreamChunk>> scripts = [];
   final List<String> inputs = [];
 
-  void reply(ChatResponse response) =>
-      scripts.add([const StreamTextDelta('…'), StreamCompleted(response)]);
+  void reply(ChatResponse response, {CallUsage? usage}) => scripts.add([
+    const StreamTextDelta('…'),
+    StreamCompleted(response, usage: usage),
+  ]);
 
   Stream<StreamChunk> _next() {
     if (scripts.isEmpty) {
@@ -105,10 +114,20 @@ class _Connector extends OpenaiConnector {
   @override
   Stream<StreamChunk> resendRequestStream() => _next();
 
+  /// What request [i] carried.
+  Map<String, dynamic> sent(int i) =>
+      jsonDecode(inputs[i]) as Map<String, dynamic>;
+
   /// The `request_type` of request [i].
-  String requestType(int i) =>
-      (jsonDecode(inputs[i]) as Map<String, dynamic>)['request_type'] as String;
+  String requestType(int i) => sent(i)['request_type'] as String;
 }
+
+TokenUsage _tokens(int prompt) =>
+    TokenUsage(promptTokens: prompt, completionTokens: prompt ~/ 10);
+
+/// What a call cost, told apart by its size.
+CallUsage _cost(int prompt) =>
+    CallUsage(model: 'gpt-5-mini', tokens: _tokens(prompt));
 
 class _Generator extends InstructionGenerator {
   @override
@@ -445,62 +464,108 @@ void main() {
     );
   });
 
-  test('code sent from the editor next to the follow-up of a code exercise '
-      'asks for the next exercise: the follow-up lapses, and the code handed '
-      'in on that exercise is its answer', () async {
+  test('code sent from the editor while the follow-up of a code exercise is '
+      'open is the answer to that follow-up (#349): out as follow_up_answer '
+      'with the follow-up and the code, on the question\'s plan; the '
+      'follow-up\'s record has the code as its answer and the cost of its '
+      'grading; then the next exercise comes, and the code handed in on it '
+      'is its own answer', () async {
     at(0);
-    planNext(_plan(ChatRequestType.completeCodeQuestion, _loA));
-    connector.reply(_colours);
+    final plan = _plan(ChatRequestType.completeCodeQuestion, _loA);
+    planNext(plan);
+    connector.reply(_colours, usage: _cost(100));
     await tutor().requestExercise();
 
     at(2);
-    connector.reply(_codeGrade(AnswerQuality.partial, followUp: _followUp));
+    connector.reply(
+      _codeGrade(AnswerQuality.partial, followUp: _followUp),
+      usage: _cost(200),
+    );
     await tutor().submitCode('for kleur in kleuren:\n    if "a" in kleur:');
     expect(history.records, hasLength(1));
     expectFollowUpInChat();
 
     // The student changes the code in the editor and sends it, instead of
-    // answering in the chat. Its grade has no plan to be recorded on; it
-    // asks for the next exercise.
+    // answering in the chat.
     at(5);
     final nextPlan = _plan(ChatRequestType.completeCodeQuestion, _loB);
     planNext(nextPlan);
+    const followUpCode =
+        'for kleur in kleuren:\n    if "a" in kleur:\n        laatste = kleur';
     connector
-      ..reply(_codeGrade(AnswerQuality.correct))
-      ..reply(_warmest);
-    await tutor().submitCode('laatste = kleur');
-    expect(connector.requestType(2), 'submit_code');
-    expect(history.records, hasLength(1), reason: 'nothing to record it on');
+      ..reply(
+        SocraticFeedback(
+          type: 'socratic_feedback',
+          quality: AnswerQuality.correct,
+          prompt: 'Juist: zonder break.',
+        ),
+        usage: _cost(40),
+      )
+      ..reply(_warmest, usage: _cost(300));
+    await tutor().submitCode(followUpCode);
+    await contents.idle;
+
+    final sent = connector.sent(2);
+    expect(sent['request_type'], 'follow_up_answer');
+    expect(sent['follow_up_question'], _followUp.question);
+    expect(sent['code'], followUpCode);
+    expect(sent.containsKey('answer'), isFalse);
+    expect(sent['chain_depth'], 1);
+    expect((sent['target_los'] as List).single['id'], 'lo-a');
+
+    expect(history.records, hasLength(2));
+    final followUp = history.records[1];
+    expect(followUp.isFollowUp, isTrue);
+    expect(followUp.chainDepth, 1);
+    expect(followUp.targetLOIds, ['lo-a']);
+    expect(followUp.questionId, isNull);
+    expect(followUp.askedAt, DateTime.utc(2026, 10, 14, 9, 2));
+    expect(followUp.usage?.byCall, {UsageCallKind.followUp: _tokens(40)});
+    expect(graded[1].answer.isFollowUp, isTrue);
+    expect(graded[1].plan, same(plan));
+    final doc = contentStore[followUp.id]!;
+    expect(doc['isFollowUp'], isTrue);
+    expect(doc['question'], {'text': _followUp.question});
+    expect(doc['answer'], {'code': followUpCode});
+    expect(doc['feedback'], 'Juist: zonder break.');
+
+    // The next exercise comes, as after a follow-up answered in the chat.
     expect(connector.requestType(3), 'complete_code');
 
     at(8);
     const answer =
         'warmste = temps[0]\nfor t in temps:\n    warmste = max(t, warmste)';
     connector
-      ..reply(_codeGrade(AnswerQuality.correct))
+      ..reply(_codeGrade(AnswerQuality.correct), usage: _cost(60))
       ..reply(_afterThat);
     await tutor().submitCode(answer);
     await contents.idle;
     await bank.idle;
 
-    expect(history.records, hasLength(2));
-    final record = history.records[1];
+    expect(connector.requestType(4), 'submit_code');
+    expect(history.records, hasLength(3));
+    final record = history.records[2];
     expect(record.isFollowUp, isFalse);
     expect(record.chainDepth, 0);
     expect(record.targetLOIds, ['lo-b']);
     expect(record.questionId, bankIdOf(_warmest));
     expect(record.askedAt, DateTime.utc(2026, 10, 14, 9, 5));
-    expect(graded[1].answer.isFollowUp, isFalse);
-    expect(graded[1].plan, same(nextPlan));
+    // Its own question and grading — not the follow-up's grading as well.
+    expect(record.usage?.byCall, {
+      UsageCallKind.question: _tokens(300),
+      UsageCallKind.grading: _tokens(60),
+    });
+    expect(graded[2].answer.isFollowUp, isFalse);
+    expect(graded[2].plan, same(nextPlan));
 
-    final doc = contentStore[record.id]!;
-    expect(doc['isFollowUp'], isFalse);
-    expect(doc['question'], {
+    final next = contentStore[record.id]!;
+    expect(next['isFollowUp'], isFalse);
+    expect(next['question'], {
       'text': _warmest.prompt,
       'code': _warmest.code,
       'questionId': record.questionId,
     });
-    expect(doc['answer'], {'code': answer});
+    expect(next['answer'], {'code': answer});
     expect(bankStore[record.questionId!], isNotNull);
   });
 

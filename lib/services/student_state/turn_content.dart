@@ -53,7 +53,8 @@ class TurnContentQuestion {
 class TurnContentAnswer {
   const TurnContentAnswer({this.code, this.picked, this.text});
 
-  /// The code submitted from the editor.
+  /// The code submitted from the editor: the answer to a code exercise, or
+  /// to a follow-up the student answered there (#349).
   final String? code;
 
   /// The option picked on a multiple-choice question.

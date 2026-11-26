@@ -1,26 +1,25 @@
 // End-to-end (#340): a follow-up the student leaves open lapses when the
 // next question comes, and the answer to that question is its own.
 //
-// A follow-up is answered in the chat. Two ways put the next question up
-// first: "Next" under a quiz whose grade asked one, and code sent from the
-// editor next to the follow-up of a code exercise — that grade has nothing
-// to be recorded on and asks for the next exercise. The follow-up used to
-// stay open through both, and the answer to the next question was recorded
-// as the follow-up's: `isFollowUp`, no `questionId`, the follow-up's
-// `askedAt`, the follow-up as its question in `turn_content`, and never into
-// the question bank. In the class data of 6EWI and 6WEWI it happened to 15
+// A follow-up is answered in the chat. "Next" under a quiz whose grade
+// asked one puts the next question up first. The follow-up used to stay
+// open through it, and the answer to the next question was recorded as the
+// follow-up's: `isFollowUp`, no `questionId`, the follow-up's `askedAt`,
+// the follow-up as its question in `turn_content`, and never into the
+// question bank. In the class data of 6EWI and 6WEWI it happened to 15
 // students, on every build from 2.8.0 to 2.16.0.
 //
 // Now the next question's answer is a turn of its own: no follow-up, the ID
 // and the moment of that question, its text in `turn_content`, and into the
 // bank when it was answered right. (A follow-up answered in the chat while
-// it is open stays one: `follow_up_after_partial`.)
+// it is open stays one: `follow_up_after_partial`. Code sent from the
+// editor next to the follow-up of a code exercise brought the next exercise
+// too, until #349 made it the follow-up's answer: `follow_up_code_answer`.)
 //
 // Real app, real navigation, real quiz view with its "Next" button, real
-// editor with its send button, real TutorService → conductor → turn
-// history, turn content and question bank services → in-memory Cosmos.
-// Only the model is scripted (`ScriptedLlm`, raw assistant text through the
-// production parser).
+// TutorService → conductor → turn history, turn content and question bank
+// services → in-memory Cosmos. Only the model is scripted (`ScriptedLlm`,
+// raw assistant text through the production parser).
 //
 // Run (all flows, one app process — see app_test.dart):
 //   flutter test integration_test -d windows
@@ -32,10 +31,7 @@ import 'dart:convert';
 import 'package:ai_tutor_python/features/progress/leerpad_page.dart';
 import 'package:ai_tutor_python/features/session/modes/practice_view.dart';
 import 'package:ai_tutor_python/features/session/modes/quiz_view.dart';
-import 'package:ai_tutor_python/features/shell/shell_state.dart';
-import 'package:ai_tutor_python/services/code/code_service.dart';
 import 'package:ai_tutor_python/services/tutor/tutor_service.dart';
-import 'package:flutter_code_editor/flutter_code_editor.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 
@@ -231,113 +227,6 @@ void main() {
     expect((content['question'] as Map)['text'], nextPrompt);
     expect((content['question'] as Map)['questionId'], id);
     expect(content['answer'], {'picked': '31'});
-    await waitForBanked(tester, harness, id!);
-
-    await harness.dispose(tester);
-  });
-
-  testWidgets('code sent from the editor next to the follow-up of a code '
-      'exercise brings the next exercise: the code handed in on it is its '
-      'own answer, not the follow-up\'s', (tester) async {
-    const first = 'kleur = ___\nprint(kleur)';
-    const next = 'warmste = ___\nprint(warmste)';
-    const answer = 'warmste = 31\nprint(warmste)';
-    final llm = ScriptedLlm([
-      completeCodeReply(text: 'Bewaar een kleur.', code: first),
-      llmEnvelope(
-        text: 'Bijna: dat is de eerste kleur.',
-        meta: jsonEncode({
-          'type': 'code_feedback',
-          'suggestion': '',
-          'overallQuality': 'partial',
-          'loSignals': [_signal('lo-print', 'positive')],
-          'followUp': {'question': _followUp},
-        }),
-      ),
-      // The code sent next to the follow-up: graded without an exercise
-      // to record it on, and the next exercise is asked for.
-      codeFeedbackReply(text: 'Dat werkt ook.', quality: 'correct'),
-      completeCodeReply(text: 'Zoek de warmste temperatuur.', code: next),
-      codeFeedbackReply(
-        text: 'Helemaal juist.',
-        quality: 'correct',
-        loSignals: [_signal('lo-print', 'positive')],
-      ),
-      completeCodeReply(text: 'Nog een.', code: 'print(___)'),
-    ]);
-    final harness = AppHarness(
-      llm: llm,
-      extraDocs: {
-        'goals': [
-          _print(['lo-print'], kind: 'apply'),
-        ],
-      },
-    );
-    await openPractice(tester, harness);
-
-    String editorText() =>
-        tester.widget<CodeField>(find.byType(CodeField)).controller.text;
-    Future<void> waitForExercise(String code) => pumpUntil(
-      tester,
-      () => editorText() == code,
-      timeout: const Duration(seconds: 30),
-      reason: 'the exercise "$code" never reached the editor',
-    );
-    void typeInEditor(String code) =>
-        harness.container
-                .read(codeServiceProvider(SessionMode.practice))
-                .controller
-                .text =
-            code;
-
-    // 1. The code exercise, "partial", with a follow-up in the chat.
-    await waitForExercise(first);
-    await waitForIdle(tester, harness);
-    typeInEditor('kleur = "rood"\nprint(kleur)');
-    await tester.pump();
-    await tester.tap(find.byTooltip('Send to tutor'));
-    await waitForFollowUp(tester, harness);
-    await waitForTurns(tester, harness, 1);
-
-    // 2. Instead of answering in the chat, the student changes the code
-    //    and sends it. The next exercise comes.
-    final beforeSend = DateTime.now().toUtc();
-    typeInEditor('kleur = "oranje"\nprint(kleur)');
-    await tester.pump();
-    await tester.tap(find.byTooltip('Send to tutor'));
-    await waitForExercise(next);
-    await waitForIdle(tester, harness);
-    expect(requestType(llm, 2), 'submit_code');
-    expect(turns(harness), hasLength(1), reason: 'nothing to record it on');
-
-    // 3. The code handed in on the next exercise is its answer.
-    typeInEditor(answer);
-    await tester.pump();
-    await tester.tap(find.byTooltip('Send to tutor'));
-    await waitForTurns(tester, harness, 2);
-    expect(requestType(llm, 4), 'submit_code');
-    await waitForExercise('print(___)');
-    expect(llm.remaining, 0);
-
-    final turn = turns(harness)[1];
-    expect(turn['isFollowUp'], isFalse);
-    expect(turn['chainDepth'], 0);
-    final id = turn['questionId'] as String?;
-    expect(id, isNotNull, reason: 'the exercise on screen has an ID');
-    expect(
-      DateTime.parse(turn['askedAt'] as String).isBefore(beforeSend),
-      isFalse,
-      reason: 'asked when the next exercise came, not when the follow-up did',
-    );
-
-    final content = await contentOf(tester, harness, turn);
-    expect(content['isFollowUp'], isFalse);
-    expect(content['question'], {
-      'text': 'Zoek de warmste temperatuur.',
-      'code': next,
-      'questionId': id,
-    });
-    expect(content['answer'], {'code': answer});
     await waitForBanked(tester, harness, id!);
 
     await harness.dispose(tester);

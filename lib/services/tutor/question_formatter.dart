@@ -250,9 +250,14 @@ class QuestionFormatter {
   /// grader is told the original follow-up question text plus the student's
   /// answer; the conductor caps signal strength to `weak` and treats the
   /// effective difficulty as `medium` regardless of `targetLOs[*].kind`.
+  ///
+  /// The answer is what the student typed in the chat ([studentAnswer],
+  /// `answer`) or the code they sent from the editor ([code], `code`,
+  /// #349); the field of the other one is left out.
   static String followUpAnswer({
     required String followUpQuestion,
-    required String studentAnswer,
+    String? studentAnswer,
+    String? code,
     String? rationale,
     int chainDepth = 1,
     List<LearningObjective> targetLOs = const [],
@@ -263,7 +268,8 @@ class QuestionFormatter {
     additionalFields: _gradingFields(
       {
         "follow_up_question": followUpQuestion,
-        "answer": studentAnswer,
+        "answer": ?studentAnswer,
+        "code": ?code,
         "chain_depth": chainDepth,
         if (rationale != null && rationale.isNotEmpty)
           "follow_up_rationale": rationale,

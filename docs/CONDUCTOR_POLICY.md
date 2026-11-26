@@ -2729,17 +2729,28 @@ The two `follow_up_allowed` variants encode the depth-1-default vs.
 depth-2-with-flag rule.
 
 **A follow-up lapses when a new question comes (#340).** A follow-up is
-answered in the chat, before anything else is put in front of the
-student. When the next question comes first — "Volgende" under a quiz
-whose follow-up is open, or code sent from the editor next to a
-follow-up, whose grade asks for the next exercise — the follow-up is
-closed the moment that question is planned, and never graded. The answer
-that follows is the answer to the new question: no follow-up, its own
-plan, level, question ID and `askedAt`, and into the bank as any new
-question (2.7). Until #340 the follow-up stayed open, and the answer to
-the new question was recorded as the follow-up's — capped at weak, no
-own question, without its question ID, with the old follow-up as its
-question in `turn_content`.
+answered before anything else is put in front of the student. When the
+next question comes first — "Volgende" under a quiz whose follow-up is
+open — the follow-up is closed the moment that question is planned, and
+never graded. The answer that follows is the answer to the new question:
+no follow-up, its own plan, level, question ID and `askedAt`, and into
+the bank as any new question (2.7). Until #340 the follow-up stayed
+open, and the answer to the new question was recorded as the
+follow-up's — capped at weak, no own question, without its question ID,
+with the old follow-up as its question in `turn_content`.
+
+**Code from the editor answers an open follow-up (#349).** A follow-up
+is answered in the chat or in the editor: code sent with "Stuur naar
+tutor" while a follow-up is open is the answer to it, as a message typed
+in the chat is (`on_followup_answered`). It goes out as
+`follow_up_answer` with the follow-up and the code, on the plan of the
+question it followed, and becomes the follow-up's record — `isFollowUp`,
+capped at weak, the follow-up as its question and the code as its answer
+in `turn_content`, the cost of its grading in its `usage` — and the next
+question comes after it as after an answer in the chat. Until #349 that
+code went out as `submit_code` without a plan: graded, never recorded,
+its cost on the next exercise's record, and the next exercise was asked
+for (the follow-up then lapsed, as above).
 
 ### 6.6 The follow-up field on the grader response
 
@@ -3160,7 +3171,9 @@ TurnContent {
     questionId: string?       // the bank id (2.7), as on the turn record
   }?                          // null when the app restarted in between
   answer: { code? | picked? | text? }?   // the code handed in, the option
-                              //   picked, or the text typed
+                              //   picked, or the text typed; a follow-up
+                              //   answered from the editor has the code
+                              //   (6.5, #349)
   feedback: string            // the grade's <TEXT>, as shown
   rawSignals: [{subgoalId, loId, signal, strength}]
                               // the grader's own, before any check; on a
