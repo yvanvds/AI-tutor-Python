@@ -264,7 +264,7 @@ class AppHarness {
 
   /// The content bundle the stand-alone app loads at start (#266), as
   /// `main()` loads the one in its assets. `null` (the default) is the app's
-  /// own assets, which hold no bundle until the first export. Only with
+  /// own assets: the bundle exported from the live content (#265). Only with
   /// [localData].
   final CurriculumBundleSource? curriculumBundle;
 

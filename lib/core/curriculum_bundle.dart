@@ -19,10 +19,9 @@
 //   - everything else (`accounts`, `lo_beliefs`, `progress`, `turn_history`,
 //     `playground_files`, …) is never touched, whatever the bundle holds.
 //
-// The same bundle again writes nothing. No bundle (the placeholder folder
-// this repository ships until the first real export) installs nothing and
-// leaves whatever was loaded before. The school mode never calls this: its
-// content is the school's database.
+// The same bundle again writes nothing. No bundle (a folder without a
+// manifest) installs nothing and leaves whatever was loaded before. The
+// school mode never calls this: its content is the school's database.
 
 import 'dart:convert';
 import 'dart:io';

@@ -7,10 +7,11 @@
 // app's own local storage (`LocalCosmosClient`) over a temp folder, with the
 // real `AuthService`. A second start goes straight to the shell.
 //
-// The content the app ships with (#266) is loaded at start. This build's
-// assets hold no bundle yet, so the first test meets an empty app; the
-// second loads the fixture bundle (test/fixtures/curriculum_bundle) and the
-// student finds its goals on the learning path.
+// The content the app ships with (#266) is loaded at start. The first test
+// runs on this build's own assets, the bundle exported from the live content
+// (#265): the student finds its first goal on the learning path, and the
+// second start loads nothing again. The second test loads the small fixture
+// bundle (test/fixtures/curriculum_bundle) instead.
 //
 // What needs a school is left out of the stand-alone app (#267): no grade
 // formula, no reports, no teacher group in the rail; no lesson badges, class
@@ -113,6 +114,32 @@ Future<Set<String>> _seenOn(
   return seen;
 }
 
+/// A file of the bundle in this build's assets (#265).
+Map<String, dynamic> _assetsJson(String name) =>
+    jsonDecode(File('$kCurriculumAssetDir/$name').readAsStringSync())
+        as Map<String, dynamic>;
+
+/// The first root goal of the bundle in the assets and its first subgoal,
+/// by their English titles where the bundle translates them. Read from the
+/// files, so a fresh export needs no change here.
+({String goal, String subgoal}) _firstGoalInAssets() {
+  List<Map<String, dynamic>> docs(String name) =>
+      (_assetsJson(name)['docs'] as List).cast<Map<String, dynamic>>();
+  final goals = docs('goals.json');
+  final english = {
+    for (final t in docs('translations.json'))
+      if (t['language'] == 'en' && t['kind'] == 'goal')
+        t['refId'] as String: t['title'] as String,
+  };
+  Map<String, dynamic> first(Iterable<Map<String, dynamic>> gs) =>
+      gs.reduce((a, b) => (a['order'] as num) <= (b['order'] as num) ? a : b);
+  final root = first(goals.where((g) => g['parentId'] == null));
+  final sub = first(goals.where((g) => g['parentId'] == root['id']));
+  String title(Map<String, dynamic> g) =>
+      english[g['id']] ?? g['title'] as String;
+  return (goal: title(root), subgoal: title(sub));
+}
+
 /// The school-only parts of the trophy case (#267), and one that stays.
 final Map<String, Finder> _trophyParts = {
   'podium': find.byKey(const ValueKey('badges-section-podium')),
@@ -136,14 +163,17 @@ final Map<String, Finder> _optionsParts = {
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
-  testWidgets('without a school: welcome, own key, then the app; a second '
-      'start goes straight to the app', (tester) async {
+  testWidgets('without a school: welcome, own key, then the app with the '
+      'content it ships with; a second start goes straight to the app', (
+    tester,
+  ) async {
     final data = Directory.systemTemp.createTempSync('ai_tutor_standalone_');
     addTearDown(() {
       if (data.existsSync()) data.deleteSync(recursive: true);
     });
 
-    // First start: nothing on the pc yet.
+    // First start: nothing on the pc yet. No `curriculumBundle`: the one in
+    // this build's assets, as `main()` loads it.
     var harness = AppHarness(appMode: const StandaloneMode(), localData: data);
     await harness.boot(tester, waitForShell: false);
 
@@ -162,7 +192,7 @@ void main() {
     await tester.tap(find.text('Save key'));
 
     await pumpUntilFound(tester, find.byType(AppShell));
-    // A while longer: the empty local database does not knock it over.
+    // A while longer: a fresh local database does not knock it over.
     for (var i = 0; i < 20; i++) {
       await tester.pump(const Duration(milliseconds: 50));
     }
@@ -172,6 +202,20 @@ void main() {
     expect(tester.takeException(), isNull);
     // The account landed in the local storage, not anywhere else.
     expect(Directory('${data.path}/accounts').existsSync(), isTrue);
+
+    // The shipped content: the first goal and its first subgoal, in
+    // English (the app's locale here) as the bundle translates them.
+    final (:goal, :subgoal) = _firstGoalInAssets();
+    await tester.tap(find.byTooltip('Learning path'));
+    await pumpUntilFound(tester, find.byType(LeerpadPage));
+    await pumpUntilFound(tester, find.textContaining(goal));
+    await pumpUntilFound(tester, find.textContaining(subgoal));
+    expect(tester.takeException(), isNull);
+    final loaded = curriculumVersionFile(data);
+    expect(jsonDecode(loaded.readAsStringSync()), {
+      'contentVersion': _assetsJson('manifest.json')['contentVersion'],
+    });
+    final loadedAt = loaded.lastModifiedSync();
 
     // What the first start left in shared preferences: the profile, the key.
     final prefs = await SharedPreferences.getInstance();
@@ -194,11 +238,16 @@ void main() {
     expect(find.byType(LocalKeyGateScreen), findsNothing);
     expect(find.text('Hi Alex,'), findsOneWidget);
     expect(tester.takeException(), isNull);
+    // The same bundle again: nothing loaded, the content still there.
+    expect(loaded.lastModifiedSync(), loadedAt);
+    await tester.tap(find.byTooltip('Learning path'));
+    await pumpUntilFound(tester, find.byType(LeerpadPage));
+    await pumpUntilFound(tester, find.textContaining(goal));
 
     await harness.dispose(tester);
   });
 
-  testWidgets('without a school, with the shipped content: after welcome and '
+  testWidgets('without a school, with the fixture content: after welcome and '
       'key the student finds its goals', (tester) async {
     final data = Directory.systemTemp.createTempSync('ai_tutor_standalone_');
     addTearDown(() {

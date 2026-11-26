@@ -181,6 +181,33 @@ class Manifest(unittest.TestCase):
         self.assertEqual(on_disk, fresh)
 
 
+class ShippedBundle(unittest.TestCase):
+    """The bundle in `assets/curriculum/` (#265): what an export wrote, and
+    still only what the guards let through."""
+
+    def setUp(self):
+        self.manifest = eb.read_manifest(eb.BUNDLE_DIR)
+        if self.manifest is None:
+            self.skipTest("no bundle exported")
+        self.bundle = eb.read_bundle(eb.BUNDLE_DIR)
+
+    def test_passes_the_guards(self):
+        self.assertEqual(set(self.bundle), set(eb.ALLOWED))
+        for container, docs in self.bundle.items():
+            for doc in docs:
+                # `clean` keeps only the list and stops at anything key-like.
+                self.assertEqual(eb.clean(container, doc), doc, f"{container}/{doc.get('id')}")
+        self.assertEqual([d["id"] for d in self.bundle["config"]], ["global"])
+        for q in self.bundle["questions"]:
+            self.assertEqual(q["status"], "active", q["id"])
+
+    def test_manifest_matches_the_content(self):
+        self.assertEqual(self.manifest["format"], eb.FORMAT)
+        self.assertEqual(self.manifest["contentVersion"], eb.content_version(self.bundle))
+        for c, entry in self.manifest["containers"].items():
+            self.assertEqual(entry["count"], len(self.bundle[c]), c)
+
+
 class Diff(unittest.TestCase):
     def test_no_changes(self):
         live = eb.read_live(FakeDb())
