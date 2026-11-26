@@ -15,7 +15,10 @@
 // build's school configuration as if the student had imported it
 // ([keepBuildSchoolAsFile]). The configuration is the same, so the student
 // stays signed in and keeps every preference; once the build no longer
-// carries a school (#308, step 3), the file decides.
+// carries a school (#308, step 3), the file decides. That file has no
+// `databaseAccess`; a build without school data then reaches the database
+// with the sign-in (`SchoolConfig.databaseAccessIn`, #336), so the file is
+// never rewritten for it.
 //
 // Switching mode — importing a school file, or leaving the school — only
 // changes what the next start decides; the app asks for a restart. The two

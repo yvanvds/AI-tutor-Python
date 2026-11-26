@@ -405,7 +405,7 @@ A school file lets students point the app at their school without a build of its
 }
 ```
 
-`databaseName` is optional (default `python-tutor`). So is `databaseAccess`, how the app reaches the database: `"masterKey"` (the default) with the database key of the build, or `"signIn"` with the user's own sign-in ([#306](https://github.com/yvanvds/AI-tutor-Python/issues/306)). `"signIn"` is not in use yet: it needs roles on the database and admin consent in the tenant first (see the issue). The app refuses a file that has a field named like a key, token or password, and a file with a newer `formatVersion` than it knows; it then says why and changes nothing.
+`databaseName` is optional (default `python-tutor`). So is `databaseAccess`, how the app reaches the database: `"masterKey"` (the default) with the database key of the build, or `"signIn"` with the user's own sign-in ([#306](https://github.com/yvanvds/AI-tutor-Python/issues/306)). A build without school data uses the sign-in for every school file, with or without this field ([#336](https://github.com/yvanvds/AI-tutor-Python/issues/336)), so the school file of an existing install keeps working as it is. The sign-in needs roles on the database and admin consent in the tenant first (see #306). The app refuses a file that has a field named like a key, token or password, and a file with a newer `formatVersion` than it knows; it then says why and changes nothing.
 
 How the app uses it:
 

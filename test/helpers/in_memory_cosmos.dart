@@ -27,6 +27,12 @@
 // carries, as in Cosmos; a replace with `ifMatch` answers 412 when the doc
 // changed since (#223). [InMemoryCosmos.beforeReplace] lets a test put
 // another app's write between a read and the replace that follows it.
+//
+// [InMemoryCosmosClient.auth] puts the app's own access in front of every
+// request (#336): the header the real client would send is made, and
+// recorded, so a test sees how the app reached its database.
+
+import 'dart:io';
 
 import 'package:ai_tutor_python/core/cosmos_client.dart';
 import 'package:ai_tutor_python/core/cosmos_query.dart';
@@ -295,11 +301,24 @@ class _InMemoryContainer implements CosmosContainer {
 /// Whole-database fake: one [InMemoryCosmos] per container name, created on
 /// first use. [install] makes it the process-wide `CosmosClient.instance`.
 class InMemoryCosmosClient implements CosmosClient {
-  InMemoryCosmosClient([Map<String, InMemoryCosmos> containers = const {}])
-    : _containers = Map.of(containers);
+  InMemoryCosmosClient([
+    Map<String, InMemoryCosmos> containers = const {},
+    this.auth,
+  ]) : _containers = Map.of(containers);
 
   final Map<String, InMemoryCosmos> _containers;
   final Map<String, CosmosContainer> _routed = {};
+
+  /// The access the app would send to the real database (#336), or `null`
+  /// (the default) for none. With one, every request through [container]
+  /// first asks it for its `Authorization` header, as `CosmosClient` does,
+  /// and the header lands in [authorizations]; a header it cannot give
+  /// fails the request, as it would fail the real one.
+  final CosmosAuth? auth;
+
+  /// The `Authorization` header of every request, in order, while [auth]
+  /// is set.
+  final List<String> authorizations = [];
 
   /// The containers whose ids are unique per partition rather than per
   /// container, with the doc field their partition key is read from.
@@ -329,9 +348,112 @@ class InMemoryCosmosClient implements CosmosClient {
   }
 
   @override
-  CosmosContainer container(String containerId) =>
-      _routed[containerId] ?? this[containerId].container;
+  CosmosContainer container(String containerId) {
+    final container = _routed[containerId] ?? this[containerId].container;
+    final auth = this.auth;
+    return auth == null
+        ? container
+        : _AuthorizedContainer(container, containerId, auth, authorizations);
+  }
 
   /// Routes every `CosmosPaths.*()` handle through this fake.
   void install() => CosmosClient.overrideInstance(this);
+}
+
+/// [_inner], with an `Authorization` header asked of [_auth] before each
+/// request (see [InMemoryCosmosClient.auth]).
+class _AuthorizedContainer implements CosmosContainer {
+  _AuthorizedContainer(this._inner, this._id, this._auth, this._seen);
+
+  final CosmosContainer _inner;
+  final String _id;
+  final CosmosAuth _auth;
+  final List<String> _seen;
+
+  /// As the real client signs it: the verb, and the doc or the container.
+  Future<void> _authorize(String verb, [String? docId]) async {
+    final coll = 'dbs/in-memory/colls/$_id';
+    _seen.add(
+      await _auth.authHeader(
+        verb: verb,
+        resourceType: 'docs',
+        resourceLink: docId == null ? coll : '$coll/docs/$docId',
+        date: HttpDate.format(DateTime.now()),
+      ),
+    );
+  }
+
+  @override
+  Future<Map<String, dynamic>?> read(
+    String id, {
+    required Object partitionKey,
+  }) async {
+    await _authorize('GET', id);
+    return _inner.read(id, partitionKey: partitionKey);
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> query(
+    String sql, {
+    Map<String, Object?> parameters = const {},
+    Object? partitionKey,
+    bool crossPartition = false,
+  }) async {
+    await _authorize('POST');
+    return _inner.query(
+      sql,
+      parameters: parameters,
+      partitionKey: partitionKey,
+      crossPartition: crossPartition,
+    );
+  }
+
+  @override
+  Future<Map<String, dynamic>> create(
+    Map<String, Object?> doc, {
+    required Object partitionKey,
+  }) async {
+    await _authorize('POST');
+    return _inner.create(doc, partitionKey: partitionKey);
+  }
+
+  @override
+  Future<Map<String, dynamic>> upsert(
+    Map<String, Object?> doc, {
+    required Object partitionKey,
+  }) async {
+    await _authorize('POST');
+    return _inner.upsert(doc, partitionKey: partitionKey);
+  }
+
+  @override
+  Future<Map<String, dynamic>> replace(
+    String id,
+    Map<String, Object?> doc, {
+    required Object partitionKey,
+    String? ifMatch,
+  }) async {
+    await _authorize('PUT', id);
+    return _inner.replace(
+      id,
+      doc,
+      partitionKey: partitionKey,
+      ifMatch: ifMatch,
+    );
+  }
+
+  @override
+  Future<void> delete(String id, {required Object partitionKey}) async {
+    await _authorize('DELETE', id);
+    return _inner.delete(id, partitionKey: partitionKey);
+  }
+
+  @override
+  Future<void> executeBatch(
+    List<BatchOperation> ops, {
+    required Object partitionKey,
+  }) async {
+    await _authorize('POST');
+    return _inner.executeBatch(ops, partitionKey: partitionKey);
+  }
 }

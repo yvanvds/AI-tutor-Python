@@ -92,7 +92,9 @@ Future<ProviderContainer> bootApp(AppMode mode) async {
       localDataRoot: dataRoot,
     );
   } else {
-    // The school's database: the build's or the school file's (#307).
+    // The school's database: the build's or the school file's (#307). A
+    // build without school data reaches it with the sign-in, whatever the
+    // file says (#336).
     CosmosClient.overrideInstance(CosmosClient.forMode(mode));
   }
   // School: the stored sign-in. Stand-alone: the local profile (#264), so a

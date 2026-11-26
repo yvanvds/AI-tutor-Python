@@ -31,6 +31,11 @@
 // in, the next start writes nothing, and nothing is written after leaving
 // the school or without a school.
 //
+// The release after it (#308, step 3; #336) has no school data. The school
+// file of step 1 says nothing about the access, and still reaches the
+// database: with a token from the stored sign-in, on every request. The
+// student stays signed in, and the file stays as step 1 wrote it.
+//
 // Every other flow runs in school mode (the harness default); this one boots
 // the real app in both.
 //
@@ -54,6 +59,7 @@ import 'package:ai_tutor_python/features/school/first_start_page.dart';
 import 'package:ai_tutor_python/features/shell/app_shell.dart';
 import 'package:ai_tutor_python/features/shell/shell_state.dart';
 import 'package:ai_tutor_python/features/standalone/standalone_welcome_page.dart';
+import 'package:ai_tutor_python/services/auth/cosmos_token_source.dart';
 import 'package:ai_tutor_python/services/badges/badge_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -523,11 +529,9 @@ void main() {
         buildSchool: build,
         schoolData: appData,
         prefs: prefs,
+        entra: entra,
       );
-      await http.runWithClient(
-        () => harness.boot(tester, waitForShell: false),
-        () => entra,
-      );
+      await harness.boot(tester, waitForShell: false);
       await pumpUntilFound(tester, find.byType(AppShell));
       expect(find.byType(SignInPage), findsNothing, reason: start);
       expect(find.byType(FirstStartPage), findsNothing, reason: start);
@@ -580,6 +584,110 @@ void main() {
     await pumpUntilFound(tester, find.byType(StandaloneWelcomePage));
     expect(harness.startedMode, const StandaloneMode());
     expect(school.existsSync(), isFalse);
+    await harness.dispose(tester);
+  });
+
+  // #336 ------------------------------------------------------------------
+
+  testWidgets('a build without school data: the school file of step 1 '
+      'reaches the database with the sign-in; the student stays signed in, '
+      'with no sign-in screen and no choice', (tester) async {
+    final appData = tempDir('ai_tutor_appdata_');
+    final school = File('${appData.path}/school.json');
+    final build = kTestSchool.named(kBuildSchoolName);
+    final databaseScope =
+        '${CosmosTokenSource.scopeFor(build.databaseEndpoint)} '
+        'offline_access';
+    const databaseToken = 'database-token';
+    bool forDatabase(http.Request r) => r.bodyFields['scope'] == databaseScope;
+    final tokenRequests = <http.Request>[];
+    final entra = MockClient((request) async {
+      tokenRequests.add(request);
+      final database = forDatabase(request);
+      return http.Response(
+        jsonEncode({
+          'access_token': database ? databaseToken : 'sign-in-access',
+          'refresh_token': 'stored-refresh',
+          if (!database)
+            'id_token': _jwt({
+              'oid': studentIdentity.oid,
+              'name': studentIdentity.displayName,
+              'email': studentIdentity.email,
+            }),
+          'expires_in': database ? 4800 : 3600,
+        }),
+        200,
+      );
+    });
+    // Signed in, as every install of the school is.
+    var prefs = <String, Object>{
+      'azure_auth_tokens_v1': jsonEncode({
+        'access_token': 'old-access',
+        'refresh_token': 'stored-refresh',
+        'id_token': null,
+        'access_token_expiry': null,
+      }),
+    };
+
+    // The transitional release (#308, step 1), a build with school data:
+    // it writes the school file, and reaches the database as it always has.
+    var harness = AppHarness(
+      decideMode: true,
+      buildSchool: build,
+      schoolData: appData,
+      prefs: prefs,
+      entra: entra,
+    );
+    await harness.boot(tester, waitForShell: false);
+    await pumpUntilFound(tester, find.byType(AppShell));
+    expect(tokenRequests.where(forDatabase), isEmpty);
+    expect(harness.cosmos.authorizations, isNotEmpty);
+    expect(
+      harness.cosmos.authorizations,
+      everyElement(startsWith(Uri.encodeComponent('type=master&ver=1.0&'))),
+    );
+    final written = school.readAsStringSync();
+    final writtenAt = school.lastModifiedSync();
+    expect(jsonDecode(written), isNot(contains('databaseAccess')));
+    final kept = await SharedPreferences.getInstance();
+    prefs = {for (final key in kept.getKeys()) key: kept.get(key)!};
+    await harness.dispose(tester);
+
+    // The release after it (#308, step 3), a build without school data,
+    // on the same pc.
+    harness = AppHarness(
+      decideMode: true,
+      schoolData: appData,
+      prefs: prefs,
+      entra: entra,
+    );
+    await harness.boot(tester, waitForShell: false);
+    await pumpUntilFound(tester, find.byType(AppShell));
+    expect(find.byType(SignInPage), findsNothing);
+    expect(find.byType(FirstStartPage), findsNothing);
+    expect(find.byTooltip('Sign out'), findsOneWidget);
+    expect(find.text('Hi ${studentIdentity.firstName},'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    // The school from the file, as the file says it.
+    expect(harness.startedMode, SchoolMode(build));
+
+    // One token for the database, silently, with the stored refresh token,
+    // from the school's own tenant and app registration.
+    final database = tokenRequests.where(forDatabase).toList();
+    expect(database, hasLength(1));
+    expect(database.single.url.path, contains(build.tenantId));
+    expect(database.single.bodyFields['grant_type'], 'refresh_token');
+    expect(database.single.bodyFields['refresh_token'], 'stored-refresh');
+    expect(database.single.bodyFields['client_id'], build.clientId);
+    // Every database request carries it; none the database key.
+    expect(harness.cosmos.authorizations, isNotEmpty);
+    expect(harness.cosmos.authorizations.toSet(), {
+      Uri.encodeComponent('type=aad&ver=1.0&sig=$databaseToken'),
+    });
+    // The file is left as step 1 wrote it.
+    expect(school.readAsStringSync(), written);
+    expect(school.lastModifiedSync(), writtenAt);
+
     await harness.dispose(tester);
   });
 

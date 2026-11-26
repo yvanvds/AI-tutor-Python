@@ -16,9 +16,11 @@
 // `redirectUri` (default `http://localhost`; the sign-in binds its own
 // loopback port anyway). So is `databaseAccess` (#306): `"signIn"` reaches
 // the database with the user's own sign-in, `"masterKey"` (the default)
-// with the database key of the build. Nothing in it is secret. A file that carries a
-// field that looks like a key, a token or a password is refused, so such a
-// value is never read, let alone kept.
+// with the database key of the build. That holds in a build with school
+// data; a build without uses the sign-in either way
+// (`SchoolConfig.databaseAccessIn`, #336). Nothing in it is secret. A file that carries a field that looks
+// like a key, a token or a password is refused, so such a value is never
+// read, let alone kept.
 //
 // The app keeps the imported file as `school.json` in its app-data folder
 // ([SchoolFileStore]); the mode follows from it at the next start

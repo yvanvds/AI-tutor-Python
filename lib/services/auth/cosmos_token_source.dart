@@ -1,7 +1,8 @@
 // Database access with the user's own Entra sign-in (#306).
 //
-// A school whose school file says `"databaseAccess": "signIn"` reaches its
-// database with an access token for the database account
+// A school whose school file says `"databaseAccess": "signIn"`, and every
+// school in a build without school data (#336), reaches its database with
+// an access token for the database account
 // (`https://<account>.documents.azure.com/user_impersonation`), not with a
 // database key. The token comes silently from the refresh token the sign-in
 // stored (`AuthService`); the user signs in once, as before.
@@ -35,10 +36,15 @@ class CosmosTokenSource {
        _now = now ?? DateTime.now;
 
   /// The source for [mode]'s school, reading the sign-in where `AuthService`
-  /// keeps it.
-  factory CosmosTokenSource.forMode(SchoolMode mode) => CosmosTokenSource(
+  /// keeps it. [httpClient] reaches the token endpoint; `null` (production)
+  /// opens its own connections.
+  factory CosmosTokenSource.forMode(
+    SchoolMode mode, {
+    http.Client? httpClient,
+  }) => CosmosTokenSource(
     school: mode.school,
     tokensPrefsKey: mode.scopedPrefsKey(AuthService.tokensPrefsKey),
+    httpClient: httpClient,
   );
 
   final SchoolConfig _school;

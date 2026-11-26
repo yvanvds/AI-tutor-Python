@@ -295,12 +295,14 @@ void main() {
   });
 
   // A build without a school has no usable database key; a school from a
-  // file must still start, and reach its sign-in screen.
+  // file must still start, and reach its sign-in screen. It reaches its
+  // database with the sign-in (#336).
   test('a school from a file starts on a build without a usable key', () {
     expect(
       () => CosmosClient.forMode(
         SchoolMode(fromFile),
         databaseKey: () => 'dummy',
+        schoolDataInBuild: () => false,
       ),
       returnsNormally,
     );

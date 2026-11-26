@@ -8,7 +8,10 @@
 //   - Entra: `authServiceProvider` is overridden with a notifier that is
 //     born signed in. The bypass lives only in this file, which is compiled
 //     into the integration-test entrypoints and never into
-//     `flutter build windows` — there is no flag in `lib/` to flip.
+//     `flutter build windows` — there is no flag in `lib/` to flip. A flow
+//     that lets the start decide (`decideMode`) runs the real `AuthService`
+//     instead, against a faked token endpoint (`entra`), and its database
+//     requests carry the access the app decides on (#336).
 //
 // Also pinned so a run is deterministic and leaves no trace on the machine:
 // the window size (see [AppHarness.windowSize]), the system locale, the
@@ -34,6 +37,7 @@
 // passes `pyRunner:`.
 
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:ai_tutor_python/core/app_mode.dart';
@@ -51,6 +55,7 @@ import 'package:ai_tutor_python/features/shell/app_shell.dart';
 import 'package:ai_tutor_python/features/shell/shell_state.dart';
 import 'package:ai_tutor_python/main.dart';
 import 'package:ai_tutor_python/services/auth/auth_service.dart';
+import 'package:ai_tutor_python/services/auth/cosmos_token_source.dart';
 import 'package:ai_tutor_python/services/config/app_locale.dart';
 import 'package:ai_tutor_python/services/config/theme_service.dart';
 import 'package:ai_tutor_python/services/github/github_device_flow.dart';
@@ -69,6 +74,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:py_runner/py_runner.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -88,6 +94,17 @@ import 'seed.dart';
 /// the key a request carried without the developer's own key ever appearing
 /// in a test.
 const String kSchoolApiKey = 'sk-school-key';
+
+/// The database key of a harness build with school data (#336): any valid
+/// base64, never the developer's own. A build without school data has CI's
+/// placeholder instead.
+final String _kBuildDatabaseKey = base64Encode(utf8.encode('harness-database'));
+
+/// The Entra token endpoint when a flow passes none: every request fails
+/// loudly, and nothing leaves the machine.
+final http.Client _noEntra = MockClient(
+  (request) async => throw StateError('no Entra in this flow: ${request.url}'),
+);
 
 /// A plain school morning (#235): Wednesday 16 September 2026, 10:00 local
 /// time. No weekend, no night, no early morning, no Friday afternoon, no
@@ -198,6 +215,7 @@ class AppHarness {
     this.buildSchool,
     this.schoolData,
     this.schoolFilePicker,
+    this.entra,
     this.updateFeedUrl,
     this.forceUpdateCheck = true,
     this.nativeGet,
@@ -256,10 +274,18 @@ class AppHarness {
   /// asks. [appMode] does not apply. Whatever the mode, the real
   /// `AuthService` runs, so a school without a stored sign-in shows the
   /// sign-in screen. Stand-alone needs [localData].
+  ///
+  /// A school's database is still the seeded in-memory one, but every
+  /// request to it carries the access the app itself decides on
+  /// (`CosmosClient.schoolAuth`, #336), recorded in
+  /// `cosmos.authorizations`: the database key, or a token from the sign-in
+  /// through [entra].
   final bool decideMode;
 
   /// The build's own school, for [decideMode]. `null` (the default) is a
-  /// build without one.
+  /// build without one. It also says whether the build has school data
+  /// (#336): with a school, a school on the database key gets a fixed test
+  /// key; without, CI's placeholder, and every school uses the sign-in.
   final SchoolConfig? buildSchool;
 
   /// The app-data folder the school file is kept in (#307). `null` (the
@@ -269,6 +295,12 @@ class AppHarness {
   /// What the school-file dialog hands the app (#307). `null` (the default)
   /// answers as if the dialog was cancelled: never the OS dialog.
   final SchoolFilePicker? schoolFilePicker;
+
+  /// Entra's token endpoint, faked, for [decideMode] (#336): the stored
+  /// sign-in's refresh at start, and the token for the database when the
+  /// school reaches it with the sign-in. `null` (the default) fails every
+  /// request loudly: no flow ever reaches the real Entra.
+  final http.Client? entra;
 
   /// The mode the app started in, once it has.
   AppMode? startedMode;
@@ -595,7 +627,22 @@ class AppHarness {
         source: curriculumBundle,
       );
     } else {
-      cosmos = InMemoryCosmosClient(seedCosmos(identity))..install();
+      // As `bootApp` reaches the school's database (#336): the access the
+      // app decides on for this school in this build, in front of the
+      // in-memory one.
+      final hasSchoolData = buildSchool != null;
+      final auth = decideMode && mode is SchoolMode
+          ? CosmosClient.schoolAuth(
+              mode,
+              databaseKey: () => hasSchoolData ? _kBuildDatabaseKey : 'dummy',
+              schoolDataInBuild: () => hasSchoolData,
+              tokenSource: CosmosTokenSource.forMode(
+                mode,
+                httpClient: entra ?? _noEntra,
+              ),
+            )
+          : null;
+      cosmos = InMemoryCosmosClient(seedCosmos(identity), auth)..install();
       for (final entry in extraDocs.entries) {
         final store = cosmos[entry.key];
         // `translations` is partitioned on a doc field (#206): a write names
@@ -704,11 +751,14 @@ class AppHarness {
     );
 
     // The stored local profile or sign-in, before the first frame, as in
-    // `main()`.
+    // `main()`. A sign-in is refreshed with [entra], never the real one.
     if (realAuth) {
-      await container
-          .read(authServiceProvider.notifier)
-          .tryAcquireTokenSilent();
+      await http.runWithClient(
+        () => container
+            .read(authServiceProvider.notifier)
+            .tryAcquireTokenSilent(),
+        () => entra ?? _noEntra,
+      );
     }
 
     return container;
