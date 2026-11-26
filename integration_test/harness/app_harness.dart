@@ -15,8 +15,9 @@
 //
 // Also pinned so a run is deterministic and leaves no trace on the machine:
 // the window size (see [AppHarness.windowSize]), the system locale, the
-// system light/dark setting, SharedPreferences (in-memory), the playground
-// file directory (temp), the update check (off),
+// system light/dark setting, SharedPreferences (in-memory), the app data and
+// Documents folders the playground reads and writes (temp — see
+// [AppHarness.appDataDir]), the update check (off),
 // its native fallback transport (none — see [AppHarness.nativeGet]) and the
 // proxy it would go through (none — see [AppHarness.proxy]), the LLM (any
 // call fails loudly unless a flow passes `llm:` or `openaiClient:`), the
@@ -77,6 +78,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:path/path.dart' as p;
 import 'package:py_runner/py_runner.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -237,6 +239,7 @@ class AppHarness {
     this.supervision,
     this.turnClockStart,
     this.extraDocs = const {},
+    this.documentsPlaygroundFiles = const {},
     Map<String, LessonRunResult> lessonResults = const {},
   }) : assert(
          llm == null || openaiClient == null,
@@ -516,7 +519,39 @@ class AppHarness {
       <({String executable, List<String> arguments})>[];
 
   late final InMemoryCosmosClient cosmos;
-  late final Directory playgroundDir;
+
+  /// The app data the playground keeps its files in (#344), as
+  /// `getApplicationSupportDirectory()` is on a pc: a temp folder of the
+  /// harness's own, gone after the flow. The real path logic runs on it —
+  /// a folder per student, the stand-alone mode's own folder.
+  late final Directory appDataDir;
+
+  /// The Documents folder, where the playground kept its files before #344
+  /// and still copies them from: a temp folder of the harness's own, seeded
+  /// with [documentsPlaygroundFiles]. Never the user's real Documents.
+  late final Directory documentsDir;
+
+  /// Files in the playground's old folder in Documents, before the app
+  /// starts (#344): by path under `AI Tutor Python/playground` — a folder
+  /// per student, e.g. `'$kStudentUid/loops.py'` — to their contents.
+  final Map<String, String> documentsPlaygroundFiles;
+
+  /// The signed-in student's playground folder, where a save lands: in the
+  /// app data, `playground/<uid>` — under `standalone/` in stand-alone mode.
+  /// Spelled out here rather than asked from `lib/`, so a flow notices when
+  /// the app puts the files anywhere else. Only once the app has started.
+  Directory get playgroundDir {
+    final uid = container.read(authServiceProvider)!.oid;
+    final standalone = container.read(appModeProvider) is StandaloneMode;
+    return Directory(
+      p.joinAll([
+        appDataDir.path,
+        if (standalone) 'standalone',
+        'playground',
+        uid,
+      ]),
+    );
+  }
 
   /// Where the goals export lands (#320): a temp folder of the harness's
   /// own, never the real Downloads. Gone after the flow.
@@ -554,7 +589,13 @@ class AppHarness {
     tester.view.physicalSize = windowSize * tester.view.devicePixelRatio;
     addTearDown(tester.view.resetPhysicalSize);
     SharedPreferences.setMockInitialValues(Map<String, Object>.of(prefs));
-    playgroundDir = Directory.systemTemp.createTempSync('ai_tutor_it_');
+    appDataDir = Directory.systemTemp.createTempSync('ai_tutor_it_');
+    documentsDir = Directory.systemTemp.createTempSync('ai_tutor_docs_');
+    documentsPlaygroundFiles.forEach((path, text) {
+      File(p.join(documentsDir.path, 'AI Tutor Python', 'playground', path))
+        ..createSync(recursive: true)
+        ..writeAsStringSync(text);
+    });
     exportDir = Directory.systemTemp.createTempSync('ai_tutor_export_');
     final schoolDir =
         schoolData ?? Directory.systemTemp.createTempSync('ai_tutor_school_');
@@ -763,8 +804,10 @@ class AppHarness {
           modelProbeConnectorProvider.overrideWithValue(llm ?? _NoLlm()),
         ],
         lessonCodeRunnerProvider.overrideWithValue(lessonRunner),
-        playgroundFileStoreProvider.overrideWithValue(
-          PlaygroundFileStore(rootDir: () async => playgroundDir),
+        // The real playground store (#344) over the harness's folders.
+        playgroundAppDataDirProvider.overrideWithValue(() async => appDataDir),
+        playgroundDocumentsDirProvider.overrideWithValue(
+          () async => documentsDir,
         ),
         goalsExportDirectoryProvider.overrideWithValue(() async => exportDir),
         if (pyRunner != null) pyRunnerProvider.overrideWithValue(pyRunner!),
@@ -858,7 +901,7 @@ class AppHarness {
     await tester.pumpWidget(const SizedBox.shrink());
     container?.dispose();
     choice?.dispose();
-    await _deletePlaygroundDir();
+    await _deletePlaygroundDirs();
     if (exportDir.existsSync()) exportDir.deleteSync(recursive: true);
     final ownSchoolDir = _ownSchoolDir;
     if (ownSchoolDir != null && ownSchoolDir.existsSync()) {
@@ -866,7 +909,8 @@ class AppHarness {
     }
   }
 
-  /// Deletes [playgroundDir], waiting out the app's last write to it.
+  /// Deletes [appDataDir] and [documentsDir], waiting out the app's last
+  /// write to the playground folder.
   ///
   /// That write can outlive a flow (#143). A save goes to disk, then to the
   /// account, and only then does the sync layer record the stamp it agreed
@@ -875,7 +919,10 @@ class AppHarness {
   /// waits on, with nothing left for the flow to observe. While that write
   /// is still in its `flush` or `close` the directory cannot be deleted on
   /// Windows, so the delete is retried ([deleteDirRetrying]).
-  Future<void> _deletePlaygroundDir() => deleteDirRetrying(playgroundDir);
+  Future<void> _deletePlaygroundDirs() async {
+    await deleteDirRetrying(appDataDir);
+    await deleteDirRetrying(documentsDir);
+  }
 }
 
 /// The Options page's own scroll view — the one a flow means when it scrolls

@@ -1,7 +1,9 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:ai_tutor_python/core/app_mode.dart';
 import 'package:ai_tutor_python/services/auth/auth_service.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
@@ -65,6 +67,11 @@ class PlaygroundFileStore {
   /// Sidecar written by the sync layer (#31). Not a `.py` file, so [list]
   /// skips it.
   static const String syncMetaFile = '_sync.json';
+
+  /// Marker in a student's folder: their files were copied in from the old
+  /// folder in Documents (#344), so that is never done again. Not a `.py`
+  /// file either.
+  static const String copiedFromDocumentsFile = '_copied_from_documents.json';
 
   static final RegExp _validName = RegExp(r'^[A-Za-z0-9_\- ]+$');
 
@@ -155,51 +162,195 @@ class PlaygroundFile {
 
 final playgroundFileProvider = StateProvider<PlaygroundFile?>((_) => null);
 
-/// Resolves the directory holding [uid]'s files: `<base>/<uid>`.
+/// The app-data folder the playground keeps its files under (#344):
+/// `getApplicationSupportDirectory()`, on Windows under `AppData\Roaming`,
+/// where the school file is kept too. A provider so that tests and the
+/// integration harness point it at a folder of their own.
+final playgroundAppDataDirProvider = Provider<Future<Directory> Function()>(
+  (ref) => getApplicationSupportDirectory,
+);
+
+/// The Documents folder, where the playground kept its files before #344.
+/// Only ever read, by the copy into the app data
+/// ([copyPlaygroundFilesFromDocuments]); never written.
+final playgroundDocumentsDirProvider = Provider<Future<Directory> Function()>(
+  (ref) => getApplicationDocumentsDirectory,
+);
+
+/// The folder that holds a folder per student (#31):
+/// `<app data>/playground` in school mode, and in the stand-alone mode's own
+/// folder (`<app data>/standalone/playground`, `AppMode.localDataDir`), so
+/// the two modes never share local files.
 ///
-/// #19 kept every file loose in `<base>`, which was fine while nothing ever
-/// left the machine. Sync (#31) uploads whatever it finds to the signed-in
-/// account and classroom machines are shared, so files are namespaced per
-/// Entra object id — otherwise the next student to sign in would push the
-/// previous one's code into their own account.
+/// Not the Documents folder (#344). Windows' Controlled folder access
+/// protects Documents (often redirected to OneDrive) and lets only the apps
+/// it knows write there; a new build of this app is not one of them, so a
+/// save failed — and with it the sync, whose sidecar lives next to the
+/// files. The app data is not protected.
+Directory playgroundBaseDir(AppMode mode, Directory appData) =>
+    Directory(p.join(mode.localDataDir(appData).path, 'playground'));
+
+/// Where the playground kept its files before #344, for both modes:
+/// `<Documents>/AI Tutor Python/playground`, a folder per student in it.
+Directory documentsPlaygroundBaseDir(Directory documents) =>
+    Directory(p.join(documents.path, 'AI Tutor Python', 'playground'));
+
+/// Resolves the directory holding [uid]'s files: `<base>/<uid>`, created
+/// when missing.
 ///
-/// Loose `.py` files from the old layout are *moved* into the folder of the
-/// first student to sign in after the upgrade. They were written by whoever
-/// last used this machine and #19 assumed one student per machine, so that is
-/// the only attribution available; moving (rather than copying) means the
-/// second student to sign in does not inherit them.
-Future<Directory> resolvePlaygroundDir(Directory base, String uid) async {
+/// Classroom machines are shared and sync (#31) uploads whatever it finds
+/// to the signed-in account, so files are kept per Entra object id (in
+/// stand-alone mode: the local profile's uid) — otherwise the next student
+/// to sign in would push the previous one's code into their own account.
+///
+/// With [documentsBase] (the folder of [documentsPlaygroundBaseDir]), the
+/// files [uid] had there are copied in, once
+/// ([copyPlaygroundFilesFromDocuments]).
+///
+/// The loose files of #19's flat layout (before v2.1.0+18, 31-08) are no
+/// longer picked up: they were moved into the first student's folder by
+/// every build since, and moving them now would mean writing in Documents.
+Future<Directory> resolvePlaygroundDir(
+  Directory base,
+  String uid, {
+  Directory? documentsBase,
+}) async {
   final dir = Directory(p.join(base.path, uid));
   if (!await dir.exists()) await dir.create(recursive: true);
-  if (!await base.exists()) return dir;
-
-  final legacy = <File>[];
-  await for (final entity in base.list(followLinks: false)) {
-    if (entity is! File) continue;
-    final name = p.basename(entity.path);
-    if (name.toLowerCase().endsWith(PlaygroundFileStore.extension) ||
-        name == PlaygroundFileStore.syncMetaFile) {
-      legacy.add(entity);
-    }
-  }
-  for (final file in legacy) {
-    final target = p.join(dir.path, p.basename(file.path));
-    if (await File(target).exists()) continue;
-    await file.rename(target);
+  if (documentsBase != null) {
+    await copyPlaygroundFilesFromDocuments(
+      from: Directory(p.join(documentsBase.path, uid)),
+      to: dir,
+    );
   }
   return dir;
 }
 
+/// Copies one student's files from their old folder in Documents ([from])
+/// into their folder in the app data ([to]), once (#344): the first time
+/// [to] is used, i.e. while it has no
+/// [PlaygroundFileStore.copiedFromDocumentsFile] yet. That marker is then
+/// written whatever the copy managed, so a file the student deletes later
+/// is never copied back from the old folder.
+///
+/// Only reads [from]: copying rather than moving, because Windows'
+/// Controlled folder access can refuse a delete or rename in Documents as
+/// well as a write; reading is allowed. A file that is already in [to] is
+/// left as it is.
+///
+/// Never throws for something in [from]. What cannot be read is left out,
+/// and the next sync brings it from the account, as on a new pc. The sync
+/// sidecar (`_sync.json`) is copied last and only when every `.py` file of
+/// [from] is in [to]: it records which files this machine agreed with the
+/// account on, and one it names that the copy left out would look deleted
+/// here, so the sync would delete it from the account too. Without the
+/// sidecar, the sync pulls what is missing.
+Future<void> copyPlaygroundFilesFromDocuments({
+  required Directory from,
+  required Directory to,
+}) async {
+  final marker = File(
+    p.join(to.path, PlaygroundFileStore.copiedFromDocumentsFile),
+  );
+  if (await marker.exists()) return;
+
+  final copied = <String>[];
+  final failed = <String>[];
+  final code = <File>[];
+  File? sidecar;
+  var complete = true;
+  try {
+    if (await from.exists()) {
+      await for (final entity in from.list(followLinks: false)) {
+        if (entity is! File) continue;
+        final name = p.basename(entity.path);
+        if (name == PlaygroundFileStore.syncMetaFile) {
+          sidecar = entity;
+        } else if (name.toLowerCase().endsWith(PlaygroundFileStore.extension)) {
+          code.add(entity);
+        }
+      }
+    }
+  } catch (e) {
+    debugPrint('Playground: cannot read ${from.path}, nothing copied: $e');
+    complete = false;
+  }
+
+  Future<void> copy(File source) async {
+    final name = p.basename(source.path);
+    try {
+      final target = File(p.join(to.path, name));
+      if (await target.exists()) return;
+      // Through a temp name, so an interrupted copy never leaves a short
+      // file under the real name; `list` skips the `.tmp`.
+      final partial = File('${target.path}.tmp');
+      await partial.writeAsBytes(await source.readAsBytes(), flush: true);
+      await partial.rename(target.path);
+      copied.add(name);
+    } catch (e) {
+      debugPrint('Playground: "$name" not copied from Documents: $e');
+      failed.add(name);
+      complete = false;
+    }
+  }
+
+  for (final file in code) {
+    await copy(file);
+  }
+  final index = sidecar;
+  if (index != null) {
+    if (complete) {
+      await copy(index);
+    } else {
+      failed.add(PlaygroundFileStore.syncMetaFile);
+    }
+  }
+
+  try {
+    await marker.writeAsString(
+      jsonEncode({
+        'from': from.path,
+        'at': DateTime.now().toUtc().toIso8601String(),
+        'copied': copied,
+        'notCopied': failed,
+      }),
+      flush: true,
+    );
+  } catch (e) {
+    // The next start tries again; a file that is there by then is kept.
+    debugPrint('Playground: copy from Documents not marked done: $e');
+  }
+}
+
 final playgroundFileStoreProvider = Provider<PlaygroundFileStore>((ref) {
   final uid = ref.watch(authServiceProvider)?.oid;
+  final mode = ref.watch(appModeProvider);
+  final appData = ref.watch(playgroundAppDataDirProvider);
+  final documents = ref.watch(playgroundDocumentsDirProvider);
+
+  Future<Directory> resolve() async {
+    final base = playgroundBaseDir(mode, await appData());
+    if (uid == null) return base;
+    Directory? documentsBase;
+    try {
+      documentsBase = documentsPlaygroundBaseDir(await documents());
+    } catch (e) {
+      debugPrint('Playground: no Documents folder, nothing to copy: $e');
+    }
+    return resolvePlaygroundDir(base, uid, documentsBase: documentsBase);
+  }
+
+  // Resolved once per student: the copy from Documents runs on the first
+  // use, not again for every file operation. A failure is not kept.
+  Future<Directory>? resolved;
   return PlaygroundFileStore(
     rootDir: () async {
-      final docs = await getApplicationDocumentsDirectory();
-      final base = Directory(
-        p.join(docs.path, 'AI Tutor Python', 'playground'),
-      );
-      if (uid == null) return base;
-      return resolvePlaygroundDir(base, uid);
+      try {
+        return await (resolved ??= resolve());
+      } catch (_) {
+        resolved = null;
+        rethrow;
+      }
     },
   );
 });
