@@ -51,6 +51,12 @@ const int kCosmosNetworkStatus = 0;
 /// (README step 3), not to retry.
 const String kCosmosContainerNotFound = 'ContainerNotFound';
 
+/// [CosmosException.code] of a 401 that no server gave: with the database
+/// on the user's sign-in (#306) nobody is signed in, so no request was sent
+/// (#345). After a sign-out this is the normal state, not a permission
+/// problem — see [CosmosException.isNotSignedIn].
+const String kCosmosNotSignedIn = 'NotSignedIn';
+
 const Set<int> _transientStatusCodes = {
   kCosmosNetworkStatus,
   408,
@@ -67,7 +73,9 @@ const Set<int> _transientStatusCodes = {
 /// (the client retries internally, so by the time this surfaces we've
 /// already exhausted retries). Network-level failures are wrapped with
 /// [kCosmosNetworkStatus] so callers see one exception type for "Cosmos
-/// didn't answer" regardless of where in the stack it failed.
+/// didn't answer" regardless of where in the stack it failed. Nobody signed
+/// in, with the database on the sign-in, is a 401 of its own
+/// ([isNotSignedIn]), never an [isAuthError].
 class CosmosException implements Exception {
   CosmosException(this.statusCode, this.message, {this.code, this.activityId});
 
@@ -76,7 +84,14 @@ class CosmosException implements Exception {
   final String? code;
   final String? activityId;
 
-  bool get isAuthError => statusCode == 401 || statusCode == 403;
+  /// The database refused the key or the token: 401 or 403, except
+  /// [isNotSignedIn] (#345), which no server said.
+  bool get isAuthError =>
+      (statusCode == 401 || statusCode == 403) && !isNotSignedIn;
+
+  /// Nobody is signed in, so no token and no request (#345): see
+  /// [kCosmosNotSignedIn]. A sign-in fixes it; resetting the app does not.
+  bool get isNotSignedIn => code == kCosmosNotSignedIn;
   bool get isThrottled => statusCode == 429;
   bool get isNotFound => statusCode == 404;
 

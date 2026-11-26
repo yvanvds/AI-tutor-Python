@@ -14,6 +14,7 @@
 
 import 'package:ai_tutor_python/features/lesson_content/lesson_content_page.dart';
 import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
+import 'package:ai_tutor_python/services/auth/auth_service.dart';
 import 'package:ai_tutor_python/services/content/content_service.dart';
 import 'package:ai_tutor_python/services/goal/goals_service.dart';
 import 'package:ai_tutor_python/services/module/module_service.dart';
@@ -99,6 +100,8 @@ void main() {
 
   Widget buildApp() => ProviderScope(
     overrides: [
+      // The polled lists are read for someone signed in (#345).
+      signedInProvider.overrideWithValue(true),
       goalsServiceProvider.overrideWithValue(
         GoalsService(container: goals.container),
       ),

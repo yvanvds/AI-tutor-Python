@@ -43,6 +43,8 @@ import 'flows/exercise_history.dart' as exercise_history;
 import 'flows/explain_paging.dart' as explain_paging;
 import 'flows/explain_poll_steady.dart' as explain_poll_steady;
 import 'flows/follow_up_after_partial.dart' as follow_up_after_partial;
+import 'flows/follow_up_code_answer.dart' as follow_up_code_answer;
+import 'flows/follow_up_lapse.dart' as follow_up_lapse;
 import 'flows/garbled_reply_retry.dart' as garbled_reply_retry;
 import 'flows/goal_delete_undo.dart' as goal_delete_undo;
 import 'flows/goal_language.dart' as goal_language;
@@ -92,6 +94,7 @@ import 'flows/restart_in_practice.dart' as restart_in_practice;
 import 'flows/run_shortcut.dart' as run_shortcut;
 import 'flows/session_narrow.dart' as session_narrow;
 import 'flows/sidebar_rail.dart' as sidebar_rail;
+import 'flows/sign_out_sign_in.dart' as sign_out_sign_in;
 import 'flows/status_report_retry.dart' as status_report_retry;
 import 'flows/stuck_advance_progress.dart' as stuck_advance_progress;
 import 'flows/stuck_own_questions.dart' as stuck_own_questions;
@@ -188,6 +191,8 @@ void main() {
   subgoal_segments.main();
   mastery_guard.main();
   follow_up_after_partial.main();
+  follow_up_lapse.main();
+  follow_up_code_answer.main();
   leerpad_demonstrated.main();
   leerpad_pick_up.main();
   leerpad_subgoal_wrap.main();
@@ -232,4 +237,5 @@ void main() {
   update_required.main();
   whats_new_overlay.main();
   app_mode.main();
+  sign_out_sign_in.main();
 }

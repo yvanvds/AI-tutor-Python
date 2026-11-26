@@ -11,6 +11,7 @@ import 'dart:io';
 import 'dart:math';
 
 import 'package:ai_tutor_python/core/app_mode.dart';
+import 'package:ai_tutor_python/core/browser_launcher.dart';
 import 'package:ai_tutor_python/services/auth/local_profile.dart';
 import 'package:ai_tutor_python/services/config/app_locale.dart';
 import 'package:crypto/crypto.dart';
@@ -18,7 +19,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 /// The handful of identity fields the rest of the app cares about. Computed
 /// once per token issuance and cached in [AuthService] state.
@@ -135,10 +135,8 @@ class AuthService extends Notifier<AccountIdentity?> {
           'prompt': 'select_account',
         },
       );
-      final launched = await launchUrl(
-        authUri,
-        mode: LaunchMode.externalApplication,
-      );
+      // The system browser, through the seam a test replaces (#345).
+      final launched = await ref.read(browserLauncherProvider)(authUri);
       if (!launched) throw Exception('Could not launch the sign-in browser.');
       final code = await _awaitAuthorizationCode(
         server,
@@ -444,6 +442,20 @@ final authServiceProvider = NotifierProvider<AuthService, AccountIdentity?>(
 
 final isTeacherProvider = Provider<bool>(
   (ref) => ref.watch(authServiceProvider)?.isTeacher ?? false,
+);
+
+/// Whether someone is signed in: changes on a sign-in and a sign-out, and on
+/// nothing else about the identity.
+///
+/// A provider that lives as long as the app and polls the database watches
+/// this, and polls only while it is `true` (#345): the polls stop at a
+/// sign-out and start again at the next sign-in. With the database on the
+/// sign-in (#306) a poll after the sign-out has no token to send, and with
+/// the database key it would read for nobody. A provider that the screens
+/// behind the sign-in hold (autoDispose, a widget's stream) stops with them.
+final signedInProvider = Provider<bool>(
+  (ref) =>
+      ref.watch(authServiceProvider.select((identity) => identity != null)),
 );
 
 class _PkceCodes {

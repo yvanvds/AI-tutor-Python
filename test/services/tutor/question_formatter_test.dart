@@ -70,6 +70,33 @@ void main() {
     expect(plain.containsKey('correct_option'), isFalse);
   });
 
+  test('followUpAnswer carries what was typed in the chat as answer, or the '
+      'code sent from the editor as code (#349) — never the other one', () {
+    final typed = jsonDecode(
+      QuestionFormatter.followUpAnswer(
+        followUpQuestion: 'Wat drukt print(3 + 4) af?',
+        studentAnswer: '7',
+      ),
+    ) as Map<String, dynamic>;
+    expect(typed['request_type'], 'follow_up_answer');
+    expect(typed['follow_up_question'], 'Wat drukt print(3 + 4) af?');
+    expect(typed['answer'], '7');
+    expect(typed.containsKey('code'), isFalse);
+
+    final sent = jsonDecode(
+      QuestionFormatter.followUpAnswer(
+        followUpQuestion: 'Hoe bewaar je de laatste kleur?',
+        code: 'laatste = kleur',
+        chainDepth: 1,
+      ),
+    ) as Map<String, dynamic>;
+    expect(sent['request_type'], 'follow_up_answer');
+    expect(sent['follow_up_question'], 'Hoe bewaar je de laatste kleur?');
+    expect(sent['code'], 'laatste = kleur');
+    expect(sent['chain_depth'], 1);
+    expect(sent.containsKey('answer'), isFalse);
+  });
+
   test('grading payloads name the subgoal of the target LOs when told '
       '(#102); question payloads never do', () {
     const lo = LearningObjective(id: 't', statement: 't', kind: LoKind.apply);

@@ -1,6 +1,7 @@
 import 'package:ai_tutor_python/core/cosmos_client.dart';
 import 'package:ai_tutor_python/core/cosmos_paths.dart';
 import 'package:ai_tutor_python/core/cosmos_safety.dart';
+import 'package:ai_tutor_python/services/auth/auth_service.dart';
 import 'package:ai_tutor_python/services/translation/translation_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -15,8 +16,10 @@ class ContentService extends Notifier<List<Content>> {
 
   CosmosContainer get _container => _containerOverride ?? CosmosPaths.content();
 
+  /// Polled while someone is signed in, like `config/global` (#345).
   @override
   List<Content> build() {
+    if (!ref.watch(signedInProvider)) return const [];
     final sub = watchAll().listen((list) => state = List.unmodifiable(list));
     ref.onDispose(sub.cancel);
     return const [];

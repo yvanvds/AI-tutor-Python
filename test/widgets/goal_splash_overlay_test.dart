@@ -7,6 +7,7 @@
 
 import 'package:ai_tutor_python/core/cosmos_safety.dart';
 import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
+import 'package:ai_tutor_python/services/auth/auth_service.dart';
 import 'package:ai_tutor_python/services/config/app_locale.dart';
 import 'package:ai_tutor_python/services/goal/goal.dart';
 import 'package:ai_tutor_python/services/splash/splash_service.dart';
@@ -80,6 +81,8 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          // The polled lists are read for someone signed in (#345).
+          signedInProvider.overrideWithValue(true),
           _locale.overrideWith((_) => locale),
           appLocaleProvider.overrideWith((ref) => ref.watch(_locale)),
           translationServiceProvider.overrideWithValue(service),

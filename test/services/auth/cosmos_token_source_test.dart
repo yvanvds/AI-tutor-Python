@@ -168,7 +168,10 @@ void main() {
       throwsA(
         isA<CosmosException>()
             .having((e) => e.statusCode, 'statusCode', 401)
-            .having((e) => e.code, 'code', 'NotSignedIn'),
+            .having((e) => e.code, 'code', 'NotSignedIn')
+            // Nobody signed in is no permission problem (#345).
+            .having((e) => e.isNotSignedIn, 'isNotSignedIn', isTrue)
+            .having((e) => e.isAuthError, 'isAuthError', isFalse),
       ),
     );
     expect(endpoint.requests, hasLength(1));

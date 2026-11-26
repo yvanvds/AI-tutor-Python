@@ -30,7 +30,9 @@ heeft. De app blijft het onderwijs sturen; het punt komt van hier.
   `replay-beliefs` leest alleen, behalve met `--apply`: dan eerst een
   back-up, niet in de lestijd, met `If-Match`, en alleen de velden van
   `lo_beliefs` die de herspeling herstelt (`BELIEF_FIELDS`, #242, #281,
-  #328).
+  #328), of met `--uitgesloten` verlaagt (#342). `markeer` leest alleen,
+  behalve met `--apply`: dan eerst een back-up, en `If-Match`; alleen het
+  veld `excluded` op `turn_history` verandert.
 - **Geen leerlingdata in de repo.** Concepten en back-ups staan buiten de
   repo (`~/ai-tutor-evaluaties`, `~/ai-tutor-backups`). De repo is publiek:
   ook een issue, PR of commit noemt geen echte leerling (#190).
@@ -45,6 +47,8 @@ python tooling/evaluation/evaluate.py apply    ~/ai-tutor-evaluaties/<...>.json
 python tooling/evaluation/evaluate.py what-if  --klas 6WEWI --leerling <naam> --tel lo_a,lo_b   # punt als die doelen meetellen
 python tooling/evaluation/evaluate.py trace    --leerling <naam> --dag 2026-10-02 [--subdoel <id>]   # een dag, oefening per oefening
 python tooling/evaluation/evaluate.py replay-beliefs --klas 6EWI [--leerling <naam>] [--regels 1.1] [--apply]   # lo_beliefs herstellen uit de herspeling
+python tooling/evaluation/evaluate.py markeer ~/ai-tutor-evaluaties/<...>.json [--wis] [--apply]   # oefeningen die niet meetellen
+python tooling/evaluation/evaluate.py replay-beliefs --klas 6EWI --uitgesloten [--apply]   # verlagen wat die oefeningen gaven
 ```
 
 `trace` (#228) toont de oefeningen van één leerling op één dag (Belgische
@@ -56,7 +60,9 @@ gevraagd leerdoel buiten de scope, onbekend leerdoel, later subdoel,
 negatief of neutraal van opzij). Een oefening van vóór #228 heeft geen
 inhoud; dat staat erbij. Werd er op een oefening geplakt van buiten de app
 (#334), dan staat er "plakken geblokkeerd: N keer, M tekens"; de geplakte
-tekst zelf bewaart de app niet. `--klas` zoekt de leerling in één klas, zonder
+tekst zelf bewaart de app niet. Is een oefening gemarkeerd als niet
+meetellend (#342, `markeer`), dan staat er "telt niet" met de reden: de
+signalen eronder tellen dan niet mee. `--klas` zoekt de leerling in één klas, zonder
 zoekt hij in alle. Alleen lezen, alleen naar de terminal: er komt geen
 bestand, want het zijn antwoorden van leerlingen.
 
@@ -74,9 +80,9 @@ tellingen, en pas na een "go" `apply`.
 | | |
 |---|---|
 | `cosmos.py` | REST-client: query met continuation, read, upsert met etag, create zonder overschrijven, delete met etag (ook gebruikt door `tooling/translations`, `tooling/question_bank` en `tooling/xp`); de inhoud van de oefeningen van een leerling (`turn_contents`, #228) |
-| `rules.py` | de regel: replay van `turn_history`, stempel, hoogste niveau, M en P; toezicht uit de lestijd van de klas (`by_timetable`); de signalen die mee op het voorstel gaan; het punt met doelen meegeteld (`score_counting`) |
+| `rules.py` | de regel: replay van `turn_history`, stempel, hoogste niveau, M en P; toezicht uit de lestijd van de klas (`by_timetable`); oefeningen die niet meetellen (`is_excluded`, #342); de signalen die mee op het voorstel gaan; het punt met doelen meegeteld (`score_counting`) |
 | `diagnostics.py` | tijdlijn, afwezigheid, bijna-lijst met herkomst en laatste vragen, profiel, fossielen, weggegooide signalen, oefeningen die niet telden voor hun leerdoel, oefeningen met geblokkeerd plakken van buiten de app (#334; een record zonder de velden is onbekend, nooit 0), het verloop van een dag (`trace`, #228) |
-| `evaluate.py` | de zeven commando's; rendert concept, sidecar en `trace` |
+| `evaluate.py` | de acht commando's; rendert concept, sidecar en `trace` |
 | `tests/` | de commando's tegen een nep-Cosmos met verzonnen leerlingen: `python -m unittest discover -s tooling/evaluation/tests` |
 
 ## Mee op het voorstel
@@ -106,9 +112,52 @@ Bij een sidecar van vóór deze tellingen laat `apply` `staleLoCount`,
 `supervisedTurns` en `homeTurns` weg in plaats van ze op 0 te zetten: een
 ontbrekend veld is eerlijker dan een verzonnen nul.
 
-## Regelversie `1.1.3-eval11`
+## Regelversie `1.1.3-eval12`
 
-PUNTENFORMULE v1.1.3, herspeeld uit `turn_history`. `eval11` (2026-11-21,
+PUNTENFORMULE v1.1.3, herspeeld uit `turn_history`. `eval12` (2026-11-26,
+#342) slaat een **oefening over die niet meetelt**: een antwoord dat de
+leerling niet zelf schreef, maar uit een chatbot plakte (opmaak die niemand
+in het antwoordvak typt, een chatbot die de lezer aanspreekt, tekst die
+sneller binnenkomt dan iemand typt). De leerkracht beslist dat, en
+`markeer` (hieronder) zet het op het document in `turn_history`: het veld
+`excluded`, met de reden, de kenmerken en de datum van de beslissing,
+bijvoorbeeld `{"reason": "chatbot", "signs": ["vet", "snel"],
+"decidedAt": "2026-11-25"}` (`rules.is_excluded`).
+
+De oefening blijft in het logboek, maar geeft geen signalen en geen
+transfer-krediet. Ze verhoogt μ niet, geeft geen stempel en geen hoogste
+niveau, en telt niet als eigen vraag. Ook een fout antwoord en een
+neutraal oordeel erop tellen niet. Ze is wel een oefening op zich: ze
+beëindigt de keten van vervolgvragen van de vraag ervoor, zoals elke vraag.
+Een vervolgvraag op een gemarkeerde oefening laat haar dus niet als juist
+tellen (#326). Een vervolgvraag die zelf niet gemarkeerd is, telt wel, als
+vervolgvraag: dat is het eigen antwoord van de leerling. Een gemarkeerde
+vervolgvraag telt niet, en maakt ook geen half juiste eigen vraag af; een
+volgende vervolgvraag in dezelfde keten kan dat nog wel.
+
+`draft`, `what-if`, `validate` en `replay-beliefs` lezen het allemaal zo:
+`rules.replay` slaat ze standaard over. `rules.replay(skip_excluded=
+False)` leest ze zoals de app ze las, en noteert per leerdoel de eerste
+gemarkeerde oefening die erop schreef (`LoState.first_excluded_at`): dat is
+de herspeling *met*, waarmee `replay-beliefs --uitgesloten` vergelijkt.
+Zonder markering verandert er niets: geen stempel, geen punt.
+
+Wat erbij komt in de uitvoer:
+
+- het concept noemt per leerling hoeveel oefeningen niet meetellen, per
+  reden (*Telt niet mee*, en in het overzicht). Ze blijven in de tijdlijn,
+  het profiel en de fossielen, en in *oefeningen deze periode* op het
+  voorstel: de leerling maakte ze, zoals de app ze telt;
+- `validate` noemt de leerlingen met gemarkeerde oefeningen. De app kent de
+  markering niet: een document waar zo'n oefening bewijs gaf, wijkt af tot
+  `replay-beliefs --uitgesloten` het verlaagt;
+- `trace` zet "telt niet" bij zo'n oefening.
+
+De app leest het veld nergens. Badges en XP blijven staan, en een
+gepubliceerd rapport verandert niet vanzelf: een nieuw concept, en daarna
+`apply` en Vrijgeven, wel.
+
+`eval11` (2026-11-21,
 #327) laat de **bewaking van beheerst** (`eval9`, hieronder) de stempel
 van het document lezen, zoals de app: `isMastered` leest
 `everMasteredBelief`, de stempel op het document. `validate` en
@@ -596,7 +645,9 @@ Een afwijking betekent dus:
 - een document waarvan `lastUpdatedAt` niet bij α en β past: de
   herschrijving van 09-11 liet de klok van de app staan bij de getallen
   van de herspeling (#328, *De klok van α en β* hieronder);
-- iets wat de log niet draagt: een signaal meer of minder dan gelogd.
+- iets wat de log niet draagt: een signaal meer of minder dan gelogd;
+- een oefening die niet meetelt (#342): de app telde ze mee, de herspeling
+  niet, tot `replay-beliefs --uitgesloten` het document verlaagt.
 
 **`--regels 1.1`** (#281) herspeelt elke oefening met de regels van 1.1,
 ook die van een build van vóór 2.13.0 (`rules.Variant(as_11=True)`): de
@@ -792,6 +843,144 @@ python tooling/evaluation/evaluate.py replay-beliefs --klas 6EWI --regels 1.1
 python tooling/evaluation/evaluate.py replay-beliefs --klas 6EWI --regels 1.1 --apply
 python tooling/evaluation/evaluate.py validate --klas 6EWI --regels 1.1
 ```
+
+## `markeer`: oefeningen die niet meetellen (#342)
+
+Een antwoord uit een chatbot telt in de app gewoon mee: het verhoogt de
+overtuiging, kan een leerdoel aangetoond maken en heft het hoogste niveau
+op. #334 blokkeert het plakken vanaf nu; `markeer` is er voor de antwoorden
+die er al zijn. De leerkracht beslist welke oefeningen het zijn (de
+diagnostiek en `trace` helpen, de beslissing is de zijne), en `markeer`
+schrijft die beslissing op het document in `turn_history`.
+
+```
+python tooling/evaluation/evaluate.py markeer ~/ai-tutor-evaluaties/markeer-2026-11-25.json            # droog
+python tooling/evaluation/evaluate.py markeer ~/ai-tutor-evaluaties/markeer-2026-11-25.json --apply    # schrijven
+python tooling/evaluation/evaluate.py markeer ~/ai-tutor-evaluaties/markeer-2026-11-25.json --wis      # markering weghalen, droog
+```
+
+Het bestand noemt per leerling (uid) de ids van de oefeningen (de id van
+hun document in `turn_history`, zoals `trace` en de diagnostiek ze vinden).
+Het zijn leerlingdata, dus het staat buiten de repo: een bestand in de repo
+weigert het commando.
+
+```json
+{
+  "reason": "chatbot",
+  "decidedAt": "2026-11-25",
+  "students": {
+    "<uid>": [
+      {"id": "<turn_history-id>", "signs": ["vet", "snel"]},
+      {"id": "<turn_history-id>", "signs": ["aanspreking"], "reason": "geplakt"},
+      "<turn_history-id>"
+    ]
+  }
+}
+```
+
+- `reason` geldt voor elke oefening, tenzij een oefening er een eigen
+  heeft; zonder reden stopt het commando. `signs` zijn de kenmerken, vrij
+  te kiezen woorden (leeg mag). `decidedAt` is de dag van de beslissing,
+  zonder: vandaag (Belgische tijd).
+- Op het document komt `excluded`: `{"reason", "signs", "decidedAt"}`.
+  Een oefening die er al zo staat, blijft staan (*al zo*). Een andere
+  markering wordt vervangen.
+- Een id die niet in `turn_history` staat, of een auditrecord, wordt
+  genoemd en niet geschreven. Een onbekende uid stopt het commando.
+- `--wis` haalt het veld weg; reden en kenmerken zijn dan niet nodig.
+
+Eerst een droge run: per leerling hoeveel oefeningen het bestand noemt,
+gevonden, te markeren (of te wissen), al zo, niet gevonden en geen
+oefening. Met `--apply` maakt het eerst een back-up van de documenten die
+het schrijft (`~/ai-tutor-backups/backup_markeer_*.json`), en schrijft het
+elk document met `If-Match` op de etag waarmee het gelezen werd. Schreef
+iets het intussen, dan blijft dat document staan en noemt de uitvoer het.
+
+Het mag in de lestijd. De app maakt documenten in `turn_history` alleen
+aan (`create`, nooit over een bestaand), en schrijft er een opnieuw op één
+plaats: als de leerkracht de signalen van een leerling afhandelt
+(`TurnHistoryService.acknowledgeAllFor`). Daar leest ze het hele document
+en schrijft ze het terug met `acknowledgedAt` erbij, dus een extra veld
+blijft staan (een test in `turn_history_service_test.dart` houdt dat zo).
+Die schrijving gebruikt geen `If-Match`: handelt de leerkracht de signalen
+van dezelfde leerling af terwijl `markeer` schrijft, draai dan de droge
+run opnieuw. Staat er *te markeren*, dan ging de markering verloren.
+
+De markering verandert `lo_beliefs` niet: de app kent ze niet en leest de
+overtuigingen zoals ze ze schreef. Dat doet `replay-beliefs --uitgesloten`.
+
+### Daarna: `replay-beliefs --uitgesloten`
+
+`replay-beliefs` herstelt in één richting (#168, #281): een stempel blijft,
+het hoogste niveau en de tellingen dalen nooit. `--uitgesloten` mag
+verlagen, maar alleen wat de gemarkeerde oefeningen gaven.
+
+```
+python tooling/evaluation/evaluate.py replay-beliefs --klas 6EWI --uitgesloten            # droog
+python tooling/evaluation/evaluate.py replay-beliefs --klas 6EWI --uitgesloten --apply    # schrijven, buiten de lesuren
+python tooling/evaluation/evaluate.py validate --klas 6EWI
+```
+
+Het herspeelt elke leerling twee keer met dezelfde regels (`--regels`) en
+dezelfde stempels van de documenten (#327): één keer met de gemarkeerde
+oefeningen, zoals de app ze las, en één keer zonder. Alleen een leerdoel
+waarop die twee verschillen (`evaluate.marking_differs`: α en β op één
+klok, de stempel, het hoogste niveau, het positief op kalibratie of de
+tellingen), wordt herschreven (`evaluate.lowered_belief`):
+
+- α en β: die van de herspeling zonder, op de klok van het document
+  (#328);
+- `firstMasteredAt`, waar de gemarkeerde oefeningen de herspeling haar
+  stempel gaven (zonder hen valt hij later of niet): weg, of later (die
+  van de herspeling zonder), als de stempel op het document niet vroeger
+  valt dan de eerste gemarkeerde oefening op dat leerdoel. Een stempel van
+  daarvoor blijft. Het is de stempel die de app leest (`app_stamp`): op een
+  oud document zonder het veld de lezing ervan;
+- `lastPositiveAtCalibratedAt` (voorwaarde 3 van de stempel), waar een
+  gemarkeerde oefening het laatste positief op kalibratie was en het op het
+  document niet vroeger valt dan de eerste gemarkeerde: dat van de
+  herspeling zonder, of weg. Anders leest de app een document zonder
+  stempel dat nog boven de lat staat als aangetoond (`everMasteredBelief`)
+  en zet ze de stempel bij haar volgende schrijving terug;
+- `highestPositiveDifficulty`: lager, als het niveau op het document dat
+  van de herspeling met de gemarkeerde oefeningen is, en dat zonder lager
+  ligt (of er niet is);
+- `ownQuestions`, `ownQuestionsRight` en `ownQuestionsRightNonMcq`, waar de
+  gemarkeerde oefeningen eraan bijdroegen: tot de telling van de herspeling
+  zonder, als het document er meer heeft. Het document telt zoals de
+  herspeling met hen (de app telt elke eigen vraag zoals de herspeling, en
+  de herschrijving van 09-11 vulde de tellingen uit het hele logboek,
+  #281), dus dat is wat ze bijdroegen, en nooit onder 0. Niet "het
+  document min wat ze bijdroegen": dat zou een tweede run, of een latere
+  markering op hetzelfde leerdoel, er nog eens aftrekken. Een telling die
+  het document niet heeft, blijft weg.
+
+Een leerdoel waarop de markering niets verandert, blijft onaangeroerd, ook
+als een gemarkeerde oefening erop schreef (een neutrale vervolgvraag
+verzet alleen de klok). Zo raakt de herschrijving geen stempel die de
+herspeling om een andere reden niet terugvindt (een oude build, de
+herschrijving van 09-11). Alle andere velden blijven zoals de app ze
+schreef, ook `lastProbedAt` en `regressedAt`. Een tweede run heeft niets
+te schrijven: elke regel komt uit waar de herspeling zonder uitkomt.
+
+De droge run toont per leerling de documenten, de gemarkeerde oefeningen,
+de leerdoelen waarop de twee herspelingen verschillen (*anders*), en wat
+zou veranderen: stempel weg, stempel later, niveau lager, α/β anders,
+kalibratie, tellingen lager. De andere regels blijven gelden: met
+`--apply` eerst een back-up van alle `lo_beliefs` en `grade_proposals`
+van de leerlingen waarvoor het schrijft, `If-Match`, en niet in de lestijd
+of terwijl een leerling werkt (`--force` schrijft toch). Daarna toont
+`validate` geen afwijking meer op die documenten.
+
+Zonder `--uitgesloten` herspeelt `replay-beliefs` ook zonder de gemarkeerde
+oefeningen, maar het neemt niets weg: het schrijft alleen α en β van die
+herspeling, en houdt elke stempel, elk niveau en elke telling.
+
+In de app daarna: een leerdoel dat zijn stempel verliest, staat in de balk
+van de sessie weer open (#325). De app stelt er een controlevraag over, ook
+bij een eerder hoofddoel (#275), dus de leerling kan het opnieuw aantonen.
+Badges en XP blijven staan; een gepubliceerd rapport verandert niet
+vanzelf.
 
 ## Varianten voor 1.1 (#248)
 

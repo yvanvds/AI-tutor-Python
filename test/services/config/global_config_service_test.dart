@@ -6,12 +6,16 @@
 // config built in memory would blank the school's OpenAI key — the one field
 // nothing in the app could put back.
 
+import 'package:ai_tutor_python/core/cosmos_safety.dart';
+import 'package:ai_tutor_python/services/auth/auth_service.dart';
 import 'package:ai_tutor_python/services/config/global_config.dart';
 import 'package:ai_tutor_python/services/config/global_config_service.dart';
+import 'package:fake_async/fake_async.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../helpers/in_memory_cosmos.dart';
+import '../../helpers/switchable_auth.dart';
 
 Map<String, dynamic> _configDoc({
   String model = 'gpt-4o',
@@ -170,5 +174,54 @@ void main() {
       isFalse,
       reason: 'the published config switched the block back on',
     );
+  });
+
+  // #345 — the service lives as long as the app, and polled `config/global`
+  // every 5 s after a sign-out too. With the database on the sign-in that
+  // poll has no token, and its 401 pushed the recovery screen over the
+  // sign-in screen.
+  test('polls only while someone is signed in: no requests after the '
+      'sign-out, and again after the next sign-in', () {
+    fakeAsync((async) {
+      config = InMemoryCosmos([_configDoc(model: 'gpt-5')]);
+      final container = ProviderContainer(
+        overrides: [
+          authServiceProvider.overrideWith(SwitchableAuth.new),
+          globalConfigServiceProvider.overrideWith(
+            () => GlobalConfigService(container: config.container),
+          ),
+        ],
+      );
+      // Held the way `updateRequirementProvider` holds it, for the life of
+      // the app.
+      container.listen(globalConfigServiceProvider, (_, _) {});
+      final auth = container.read(authServiceProvider.notifier);
+
+      async.flushMicrotasks();
+      expect(config.reads, 1, reason: 'the first poll, right away');
+      expect(container.read(globalConfigServiceProvider)?.model, 'gpt-5');
+      async.elapse(kCosmosPollInterval * 2);
+      expect(config.reads, 3);
+
+      auth.signOut();
+      async.elapse(Duration.zero);
+      final atSignOut = config.reads;
+      async.elapse(kCosmosPollInterval * 4);
+      expect(
+        config.reads,
+        atSignOut,
+        reason: 'polled config/global with nobody signed in',
+      );
+      expect(container.read(globalConfigServiceProvider), isNull);
+
+      auth.signIn();
+      async.elapse(Duration.zero);
+      expect(config.reads, atSignOut + 1);
+      expect(container.read(globalConfigServiceProvider)?.model, 'gpt-5');
+      async.elapse(kCosmosPollInterval);
+      expect(config.reads, atSignOut + 2);
+
+      container.dispose();
+    });
   });
 }

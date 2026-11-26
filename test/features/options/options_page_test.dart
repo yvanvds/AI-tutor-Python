@@ -26,6 +26,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:ai_tutor_python/core/app_mode.dart';
+import 'package:ai_tutor_python/core/browser_launcher.dart';
 import 'package:ai_tutor_python/core/school_file.dart';
 import 'package:ai_tutor_python/core/update_bootstrap.dart';
 import 'package:ai_tutor_python/core/update_controller.dart';

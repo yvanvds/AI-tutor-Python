@@ -23,6 +23,7 @@ import 'package:ai_tutor_python/core/chat_request_type.dart';
 import 'package:ai_tutor_python/core/question_difficulty.dart';
 import 'package:ai_tutor_python/features/session/viewed_content_state.dart';
 import 'package:ai_tutor_python/features/shell/shell_state.dart';
+import 'package:ai_tutor_python/services/auth/auth_service.dart';
 import 'package:ai_tutor_python/services/chat/chat_notice.dart';
 import 'package:ai_tutor_python/services/chat/chat_service.dart';
 import 'package:ai_tutor_python/services/config/app_locale.dart';
@@ -248,6 +249,8 @@ void main() {
     ]);
     pc = ProviderContainer(
       overrides: [
+        // The polled lists are read for someone signed in (#345).
+        signedInProvider.overrideWithValue(true),
         appLocaleProvider.overrideWith((ref) => ref.watch(_locale)),
         translationServiceProvider.overrideWithValue(
           TranslationService(container: translations.container),

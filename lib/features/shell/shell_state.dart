@@ -96,8 +96,13 @@ final sectionProvider = StateProvider<Section>((_) => Section.session);
 /// Streams the persisted `Progress` doc for a single goal id, used by the
 /// ambient rim. autoDispose so a stream isn't held open after the active
 /// child goal changes.
+///
+/// Polled only while someone is signed in (#345): [ambientProgressProvider]
+/// lives as long as the app and keeps this one alive after the sign-out,
+/// when the screens that read it are gone.
 final _progressByGoalIdStreamProvider = StreamProvider.autoDispose
     .family<Progress?, String>((ref, goalId) {
+      if (!ref.watch(signedInProvider)) return Stream.value(null);
       return ref.watch(progressServiceProvider).streamByGoalId(goalId);
     });
 
@@ -182,33 +187,36 @@ XpState _xpBreakdown({required int oefeningCount, required int masteryXp}) {
 
 /// The mastery part of the XP: `progress × kXpPerSubgoal` summed over the
 /// non-optional subgoals, re-emitted on every progress poll.
-final masteryXpProvider = StreamProvider<int>((ref) async* {
+///
+/// A stream put together, not an `async*` body with `await for` (#345): a
+/// generator that waits in `await for` hears that it was cancelled only at
+/// the next value, and a progress poll that keeps failing — no token after a
+/// sign-out — never brings one. The poll went on after every sign-out. Here
+/// the sign-out cancels the poll with the rest.
+final masteryXpProvider = StreamProvider<int>((ref) {
   // Only react to sign-in/sign-out, not to every poll-driven re-emission of
   // the account doc — Account has no `==` override, so each 5 s
   // accountServiceProvider tick is a "new" object and would otherwise
   // tear this provider down and flash the XP pill back to 0.
   final signedIn = ref.watch(accountServiceProvider.select((a) => a != null));
-  if (!signedIn) {
-    yield 0;
-    return;
-  }
-  final subgoals = (await ref.watch(goalsServiceProvider).getAllGoalsOnce())
-      .where((g) => g.parentId != null && !g.optional)
-      .toList();
-  if (subgoals.isEmpty) {
-    yield 0;
-    return;
-  }
-  final progressStream = ref.watch(progressServiceProvider).watchAll();
-  await for (final progress in progressStream) {
-    final byId = {for (final p in progress) p.goalID: p};
-    yield subgoals
-        .fold<double>(
-          0.0,
-          (acc, g) => acc + (byId[g.id]?.progress ?? 0.0) * kXpPerSubgoal,
-        )
-        .round();
-  }
+  if (!signedIn) return Stream.value(0);
+  final goals = ref.watch(goalsServiceProvider);
+  final progressService = ref.watch(progressServiceProvider);
+  return Stream.fromFuture(goals.getAllGoalsOnce()).asyncExpand((all) {
+    final subgoals = all
+        .where((g) => g.parentId != null && !g.optional)
+        .toList();
+    if (subgoals.isEmpty) return Stream.value(0);
+    return progressService.watchAll().map((progress) {
+      final byId = {for (final p in progress) p.goalID: p};
+      return subgoals
+          .fold<double>(
+            0.0,
+            (acc, g) => acc + (byId[g.id]?.progress ?? 0.0) * kXpPerSubgoal,
+          )
+          .round();
+    });
+  });
 });
 
 /// The signed-in student's `oefeningCount` (#217); 0 when signed out. An

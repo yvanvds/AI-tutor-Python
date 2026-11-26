@@ -6,7 +6,8 @@
     python tooling/evaluation/evaluate.py apply    <draft>.json [--force]
     python tooling/evaluation/evaluate.py what-if  --klas 6WEWI --leerling <naam> --tel lo_a,lo_b [--mijlpaal ...]
     python tooling/evaluation/evaluate.py trace    --leerling <naam> --dag 2026-10-02 [--subdoel <id>] [--klas 6WEWI]
-    python tooling/evaluation/evaluate.py replay-beliefs --klas 6EWI [--leerling <naam> ...] [--regels 1.1] [--apply [--force]]
+    python tooling/evaluation/evaluate.py replay-beliefs --klas 6EWI [--leerling <naam> ...] [--regels 1.1] [--uitgesloten] [--apply [--force]]
+    python tooling/evaluation/evaluate.py markeer  <bestand>.json [--wis] [--apply]
 
 `draft` writes two files outside the repo (default `C:\\Users\\yvan\\ai-tutor-evaluaties`):
 a Markdown draft to discuss, and a JSON sidecar that `apply` reads. The
@@ -14,7 +15,15 @@ JSON is the source of truth for what gets written; the Markdown is for
 people. `what-if` prints the number `rules.score` gives with the named LOs
 counted as demonstrated: what a teacher's adjustment comes to by the rule.
 Nothing is written to Cosmos by `draft`, `validate`, `what-if` or `trace`,
-nor by `replay-beliefs` without `--apply`.
+nor by `replay-beliefs` or `markeer` without `--apply`.
+
+`markeer` (#342) marks oefeningen in `turn_history` as not counting — the
+field `excluded`, with the reason, the signs and the day of the decision —
+from a file outside the repo that names them per student; `--wis` takes the
+marking away again. Every replay skips a marked oefening (`rules.is_excluded`,
+`eval12`). `replay-beliefs --uitgesloten` then lowers on `lo_beliefs` what
+the marked oefeningen gave, and only that: it replays with and without them
+and rewrites only an LO on which the two differ.
 
 `replay-beliefs` (#242) replays `lo_beliefs` from `turn_history` with the
 replay `validate` compares them to, and restores the fields of
@@ -199,6 +208,7 @@ def cmd_draft(args) -> None:
                 "cross_root": dx.discarded_cross_root(turns, goals, ms_subgoals),
                 "lost": dx.lost_oefeningen(turns, goals, ms_subgoals),
                 "blocked_pastes": dx.blocked_pastes(turns),
+                "excluded": _excluded_reasons(turns),
                 "has_data": any(lo.key in st for lo in los),
             }
         )
@@ -218,6 +228,23 @@ def cmd_draft(args) -> None:
         sc = p["score"]
         flag = "  (geen data)" if not p["has_data"] else ("  afwezig: " + ", ".join(p["absent"]) if p["absent"] else "")
         print(f"  {p['name']:26} kern {sc.core_counted:2}/{sc.core_total}  uitbr {sc.extension_mastered}/{sc.extension_total}  moeilijk {sc.hard_count:2}/{sc.mastered_total:<2}  punt {sc.proposal:3}{flag}")
+
+
+def _excluded_reasons(turns: list[dict]) -> dict[str, int]:
+    """The oefeningen marked as not counting (#342, `rules.is_excluded`), by
+    reason, most first; a marking without a readable reason under `?`."""
+    reasons: dict[str, int] = {}
+    for t in turns:
+        if rules.is_excluded(t):
+            mark = t["excluded"]
+            reason = mark.get("reason") if isinstance(mark, dict) else None
+            key = reason if isinstance(reason, str) and reason else "?"
+            reasons[key] = reasons.get(key, 0) + 1
+    return dict(sorted(reasons.items(), key=lambda kv: (-kv[1], kv[0])))
+
+
+def _oefeningen(n: int) -> str:
+    return f"{n} {'oefening' if n == 1 else 'oefeningen'}"
 
 
 def _lo_label(lo: rules.MilestoneLo) -> str:
@@ -288,7 +315,7 @@ def _render_md(milestone, klas, per_student, now, json_path, period_start) -> st
     L.append("")
     L.append(_expected_level(milestone["expectedDifficulty"]))
     L.append("")
-    L.append("**Zo is het getal gemaakt.** Elke oefening uit `turn_history` is herspeeld met de regels van v1.1. Drie daarvan zijn op 23-09 met de leerkracht beslist: een fout op `hard` weegt ×0,6 en op `easy` ×1,4 (#169); een leerdoel dat ooit aan de drie beheersingsvoorwaarden voldeed blijft aangetoond (#168); een opmerking van de grader over een eerder subdoel telt niet als negatief bewijs (#167). Een oefening onder toezicht — in de lestijd van de klas, 10 minuten ervoor en erna inbegrepen, ook van vóór de app dat zo bijhield (#219) — weegt ×1,25, een oefening thuis ×1,0. Een leerdoel is aangetoond vanaf twee juiste antwoorden (bewijs ≥ 5,75, en alleen een vraag over het leerdoel zelf toont het aan) voor een oefening van een build vanaf 2.12.0; daarvoor volstond bewijs 4, zoals de app toen stempelde (#276). Voor een oefening van een build vanaf 2.13.0 krimpt vóór elk nieuw antwoord wat een leerdoel aan bewijs heeft met 0,7: oude antwoorden wegen minder naarmate er meer volgen, juist en fout (#278). Een opfris- of controlevraag telt zoals in de app: als rechtstreekse vraag over haar eigen leerdoel, en de andere signalen van die oefening tegenover het subdoel waar de leerling toen mee bezig was. Kern = aangetoond én hoogste niveau (waarop het doel juist beantwoord werd) ≥ verwacht niveau van de mijlpaal. `M = 50·k + 50·k·(0,6·u + 0,4·d)`, en het punt is `P = M`, zonder groeiterm (v1.0.16).")
+    L.append("**Zo is het getal gemaakt.** Elke oefening uit `turn_history` is herspeeld met de regels van v1.1. Drie daarvan zijn op 23-09 met de leerkracht beslist: een fout op `hard` weegt ×0,6 en op `easy` ×1,4 (#169); een leerdoel dat ooit aan de drie beheersingsvoorwaarden voldeed blijft aangetoond (#168); een opmerking van de grader over een eerder subdoel telt niet als negatief bewijs (#167). Een oefening onder toezicht — in de lestijd van de klas, 10 minuten ervoor en erna inbegrepen, ook van vóór de app dat zo bijhield (#219) — weegt ×1,25, een oefening thuis ×1,0. Een leerdoel is aangetoond vanaf twee juiste antwoorden (bewijs ≥ 5,75, en alleen een vraag over het leerdoel zelf toont het aan) voor een oefening van een build vanaf 2.12.0; daarvoor volstond bewijs 4, zoals de app toen stempelde (#276). Voor een oefening van een build vanaf 2.13.0 krimpt vóór elk nieuw antwoord wat een leerdoel aan bewijs heeft met 0,7: oude antwoorden wegen minder naarmate er meer volgen, juist en fout (#278). Een opfris- of controlevraag telt zoals in de app: als rechtstreekse vraag over haar eigen leerdoel, en de andere signalen van die oefening tegenover het subdoel waar de leerling toen mee bezig was. Kern = aangetoond én hoogste niveau (waarop het doel juist beantwoord werd) ≥ verwacht niveau van de mijlpaal. `M = 50·k + 50·k·(0,6·u + 0,4·d)`, en het punt is `P = M`, zonder groeiterm (v1.0.16). Een oefening die de leerkracht markeerde als niet meetellend (bijvoorbeeld een antwoord uit een chatbot, #342) blijft in de tijdlijn en het profiel, maar geeft geen bewijs: geen μ, geen stempel, geen hoogste niveau.")
     L.append("")
     L.append("**Wat hieronder géén invloed heeft op het getal:** alles onder *diagnostiek*. Dat is er om de leerkracht te informeren. Een aanpassing van het punt is een beslissing van de leerkracht en krijgt een reden in het vak *Aanpassing*; die reden gaat mee naar het rapport.")
     L.append("")
@@ -330,6 +357,9 @@ def _render_md(milestone, klas, per_student, now, json_path, period_start) -> st
         pasted = p["blocked_pastes"]["with"]
         if pasted:
             sig.append(f"plakken geblokkeerd bij {pasted} {'oefening' if pasted == 1 else 'oefeningen'}")
+        excluded = sum(p["excluded"].values())
+        if excluded:
+            sig.append(f"{_oefeningen(excluded)} {'telt' if excluded == 1 else 'tellen'} niet mee")
         L.append(f"| {p['name']} | {sc.core_counted}/{sc.core_total} | {sc.extension_mastered}/{sc.extension_total} | {sc.hard_count}/{sc.mastered_total} | **{sc.proposal}** | {need_s} | {', '.join(sig)} |")
     L.append("")
     for p in sorted(per_student, key=lambda p: p["name"]):
@@ -351,6 +381,14 @@ def _render_md(milestone, klas, per_student, now, json_path, period_start) -> st
         rel = p["reliability"]
         L.append(f"**Mee op het voorstel:** verouderd {rel.stale_lo_count} leerdoel(en) (nooit bevraagd: {sc.never_probed}) · oefeningen deze periode: {rel.supervised_turns} onder toezicht, {rel.home_turns} thuis.")
         L.append("")
+        if p["excluded"]:
+            n = sum(p["excluded"].values())
+            why = ", ".join(f"{reason} {count}" for reason, count in p["excluded"].items())
+            L.append(
+                f"**Telt niet mee:** {_oefeningen(n)} ({why}), gemarkeerd door de leerkracht (#342)."
+                " Ze staan in de tijdlijn en het profiel, maar geven geen bewijs; de oefeningen deze periode tellen ze mee."
+            )
+            L.append("")
         L.append("### Diagnostiek")
         L.append("")
         L.append("**Per lesdag** (oefeningen · % juist · kalibratie · afgeronde subdoelen · waar):")
@@ -581,8 +619,12 @@ def cmd_validate(args) -> None:
     students = cosmos.accounts(args.klas)
     variant = _variant(args)
     print(f"{'leerling':26}{'docs':>6}{'vergeleken':>12}{'|d mean|>0.01':>14}{'hoogste niveau anders':>24}{'laatste build':>16}")
+    marked = []
     for a in students:
         turns, stored, st = _replay_student(a["uid"], goals, variant)
+        n_marked = sum(1 for t in turns if rules.is_excluded(t))
+        if n_marked:
+            marked.append(f"{_full_name(a)} ({n_marked})")
         by_build = st if variant == rules.CURRENT else rules.replay(turns, goals)
         n = off = rat = 0
         for key, b in stored.items():
@@ -608,6 +650,12 @@ def cmd_validate(args) -> None:
         " het lesrooster van de klas."
     )
     print(_rules_note(args))
+    if marked:
+        print(
+            "Oefeningen die niet meetellen (markeer, #342), overgeslagen in de herspeling: " + ", ".join(marked) + "."
+            " De app kent de markering niet: een document waar zo'n oefening bewijs gaf, wijkt af tot"
+            f" replay-beliefs --klas {args.klas}{_rules_flag(args)} --uitgesloten het verlaagt."
+        )
 
 
 def _kept_level(state: rules.LoState, by_build: rules.LoState | None) -> str | None:
@@ -1027,6 +1075,146 @@ def belief_effects(stored: dict, new: dict, now: dt.datetime) -> set[str]:
     return effects
 
 
+# ---- replay-beliefs --uitgesloten (#342) ----------------------------------------
+
+# The own-question counts on a doc and on a `rules.LoState`.
+_COUNTS = (("ownQuestions", "own_questions"), ("ownQuestionsRight", "own_right"),
+           ("ownQuestionsRightNonMcq", "own_right_open"))
+
+
+def marking_differs(marked: rules.LoState, without: rules.LoState | None) -> bool:
+    """Whether the oefeningen marked as not counting changed an LO (#342):
+    [marked] is its replay with them (`skip_excluded=False`), [without] the
+    replay without them, None where only marked oefeningen reached it. They
+    differ in α and β on one clock (beyond `BELIEF_TOLERANCE`), the stamp,
+    the highest level, the positive at calibration or the counts. A marked
+    neutral moves only the clock: no difference."""
+    if marked.first_excluded_at is None:
+        return False
+    w = without or rules.LoState()
+    at = max((c for c in (marked.last_at, w.last_at) if c is not None), default=None)
+    (a, b), (c, d) = rules.decayed(marked, at), rules.decayed(w, at)
+    return (
+        abs(a - c) > BELIEF_TOLERANCE or abs(b - d) > BELIEF_TOLERANCE
+        or marked.first_mastered_at != w.first_mastered_at
+        or marked.ratchet != w.ratchet
+        or marked.positive_at_calibrated_at != w.positive_at_calibrated_at
+        or any(getattr(marked, attr) != getattr(w, attr) for _, attr in _COUNTS)
+    )
+
+
+def lowered_belief(stored: dict, marked: rules.LoState, without: rules.LoState | None) -> dict:
+    """[stored] with what the oefeningen marked as not counting gave taken
+    away (#342, `replay-beliefs --uitgesloten`), for an LO where
+    `marking_differs`. [marked] and [without] are its replays with and
+    without them, with the same rules and the same doc stamps. Unlike
+    `replayed_belief` this may lower, and only by what the marking changes:
+
+    - α and β: those of the replay without, on the doc's clock (#328,
+      `_on_one_clock`), unless within `BELIEF_TOLERANCE` there;
+    - `firstMasteredAt`, where the marked oefeningen gave the replay its
+      stamp (without them it falls later or not at all): gone, or the
+      later one of the replay without — but only when the stamp the app
+      reads (`app_stamp`) does not fall before the first marked oefening on
+      the LO (`LoState.first_excluded_at`). A stamp from before stays, as
+      does one the replay does not reproduce (another reason, an old
+      build, the rewrite of 09-11);
+    - `lastPositiveAtCalibratedAt` (condition 3 of the stamp), where a
+      marked oefening was the replay's last positive at calibration and the
+      doc's does not fall before the first marked one: that of the replay
+      without, or gone. Otherwise a doc without its stamp that is still
+      over the bar reads as mastered (`everMasteredBelief`), and the app
+      would stamp it again at its next write;
+    - `highestPositiveDifficulty`: lower, when the doc's level is that of
+      the replay with the marked oefeningen and the replay without has a
+      lower one (or none);
+    - `ownQuestions`, `ownQuestionsRight`, `ownQuestionsRightNonMcq`, where
+      the marked oefeningen added to the count in the replay: down to the
+      count of the replay without them, where the doc has more. A doc
+      counts as the replay with them does (the app counts each own
+      question as the replay does, and the rewrite of 09-11 filled the
+      counts from the whole log, #281), so that is what the marked
+      oefeningen added — and never under 0. Not "the doc minus what they
+      added": that would take it again on a second run, or on a later
+      marking of the same LO. A count the doc does not have stays away.
+
+    Every other field stays as the app wrote it. A second run has nothing
+    to write: every rule above lands where the replay without lands."""
+    doc = dict(stored)
+    w = without or rules.LoState()
+    first_marked = marked.first_excluded_at
+    (alpha, beta), (new_alpha, new_beta), at = _on_one_clock(stored, w)
+    if abs(new_alpha - alpha) > BELIEF_TOLERANCE or abs(new_beta - beta) > BELIEF_TOLERANCE:
+        doc["alpha"], doc["beta"] = new_alpha, new_beta
+        if at is not None and at != _stored_at(stored.get("lastUpdatedAt")):
+            doc["lastUpdatedAt"] = _app_iso(at)
+    stamp = app_stamp(stored)
+    target = stamp
+    gave_stamp = marked.first_mastered_at is not None and (
+        w.first_mastered_at is None or w.first_mastered_at > marked.first_mastered_at
+    )
+    if gave_stamp and stamp is not None and first_marked is not None and stamp >= first_marked:
+        target = None if w.first_mastered_at is None else max(w.first_mastered_at, stamp)
+    if target is None:
+        doc.pop("firstMasteredAt", None)
+    elif target != stamp:
+        doc["firstMasteredAt"] = _app_iso(target)
+    calibrated = _stored_at(stored.get("lastPositiveAtCalibratedAt"))
+    if (
+        calibrated is not None and first_marked is not None and calibrated >= first_marked
+        and marked.positive_at_calibrated_at != w.positive_at_calibrated_at
+    ):
+        if w.positive_at_calibrated_at is None:
+            doc.pop("lastPositiveAtCalibratedAt", None)
+        elif w.positive_at_calibrated_at < calibrated:
+            doc["lastPositiveAtCalibratedAt"] = _app_iso(w.positive_at_calibrated_at)
+    if (
+        stored.get("highestPositiveDifficulty") == marked.ratchet
+        and rules.DIFF_ORDER[w.ratchet] < rules.DIFF_ORDER[marked.ratchet]
+    ):
+        if w.ratchet is None:
+            doc.pop("highestPositiveDifficulty", None)
+        else:
+            doc["highestPositiveDifficulty"] = w.ratchet
+    for field_name, attr in _COUNTS:
+        n, floor = _stored_count(stored.get(field_name)), getattr(w, attr)
+        if n is not None and getattr(marked, attr) > floor and n > floor:
+            doc[field_name] = max(0, floor)
+    if target is not None and app_stamp(doc) != target:
+        # The stamp the app read on an old doc without the field, which the
+        # new α and β would end (as in `replayed_belief`).
+        doc["firstMasteredAt"] = _app_iso(target)
+    return doc
+
+
+def lowered_changes(stored: dict, new: dict) -> set[str]:
+    """What [new] changes on [stored] in `--uitgesloten` (#342), by what the
+    app reads: `alpha/beta` (with their clock), `stamp removed`, `stamp
+    later`, `stamp kept` (written as the app read it), `stamp gained` (a
+    marked wrong answer taken away lets an old doc read as mastered),
+    `level lowered`, `calibration` (the positive at calibration earlier or
+    gone), `counts lowered`. Empty: nothing to write."""
+    changes = set()
+    if any(new.get(f) != stored.get(f) for f in ("alpha", "beta", "lastUpdatedAt")):
+        changes.add("alpha/beta")
+    before, after = app_stamp(stored), app_stamp(new)
+    if before is not None and after is None:
+        changes.add("stamp removed")
+    elif before is None and after is not None:
+        changes.add("stamp gained")
+    elif before is not None and after > before:
+        changes.add("stamp later")
+    elif new.get("firstMasteredAt") != stored.get("firstMasteredAt"):
+        changes.add("stamp kept")
+    if new.get("highestPositiveDifficulty") != stored.get("highestPositiveDifficulty"):
+        changes.add("level lowered")
+    if new.get("lastPositiveAtCalibratedAt") != stored.get("lastPositiveAtCalibratedAt"):
+        changes.add("calibration")
+    if any(new.get(f) != stored.get(f) for f, _ in _COUNTS):
+        changes.add("counts lowered")
+    return changes
+
+
 def _class_at_work(students: list[dict], klas: str) -> list[str]:
     """Why a write to `lo_beliefs` now would race the class: its lesson time
     by the timetable (#219, the 10-minute margin included), or a student
@@ -1063,6 +1251,9 @@ def cmd_replay_beliefs(args) -> None:
     last two come back as rechecks (#275), and filling the counts is what
     makes them so.
 
+    `--uitgesloten` (#342) lowers instead what the oefeningen marked as not
+    counting gave (`_plan_lowering`), and only that.
+
     A dry run unless `--apply`. With it: refuses in the lesson time of the
     class or while a student works (`--force` to go on), backs up every
     `lo_beliefs` and `grade_proposals` doc of the students it writes for to
@@ -1078,6 +1269,39 @@ def cmd_replay_beliefs(args) -> None:
         picked = [_pick_student(in_class, name, args.klas) for name in args.leerling]
         students = [a for a in in_class if any(p["uid"] == a["uid"] for p in picked)]
 
+    planned = (_plan_lowering if args.uitgesloten else _plan_restoring)(args, students, goals)
+    if not args.apply:
+        keep = f" (met{_rules_flag(args)})" if args.regels else ""
+        print(f"\nDroge run: er is niets geschreven. Schrijven: dezelfde opdracht{keep} met --apply erbij, buiten de lesuren.")
+        return
+    if not planned:
+        print("\nNiets te schrijven.")
+        return
+    busy = _class_at_work(students, args.klas)
+    if busy and not args.force:
+        sys.exit("De klas werkt; niets geschreven. Wacht, of --force:\n  " + "\n  ".join(busy))
+    writers = {a["uid"] for a, _, _ in planned}
+    label = f"{_slug(args.klas)}_replay-beliefs" + ("-uitgesloten" if args.uitgesloten else "")
+    path = _backup([a for a in students if a["uid"] in writers], None, BACKUP_DIR, label)
+    print(f"\nback-up: {path}")
+
+    written = conflicts = 0
+    for a, stored, new in planned:
+        try:
+            cosmos.upsert("lo_beliefs", new, a["uid"], etag=stored.get("_etag"))
+            written += 1
+        except cosmos.Conflict:
+            conflicts += 1
+            print(f"  {_full_name(a)}: {stored['subgoalId']}/{stored['loId']} veranderde intussen — niet geschreven")
+    print(f"geschreven {written}, conflicten {conflicts}" + (" (draai het opnieuw voor die)" if conflicts else ""))
+    print(f"Controleer met: evaluate.py validate --klas {args.klas}{_rules_flag(args)}")
+
+
+def _plan_restoring(args, students: list[dict], goals: dict) -> list[tuple[dict, dict, dict]]:
+    """The rewrite `replay-beliefs` plans without `--uitgesloten`, printed
+    as its dry run: per student the docs `replayed_belief` changes, with
+    `belief_changes` and `belief_effects`. Returns (student, stored doc,
+    new doc) for each."""
     print(
         f"{'leerling':26}{'docs':>6}{'herspeeld':>11}{'te schrijven':>14}{'stempel erbij':>15}"
         f"{'stempel vroeger':>17}{'niveau hoger':>14}{'α/β anders':>12}{'klok erbij':>12}{'tellingen':>11}"
@@ -1161,34 +1385,250 @@ def cmd_replay_beliefs(args) -> None:
         " herspeeld) veranderen; een leerdoel zonder document krijgt er geen."
     )
     print(_rules_note(args))
-    if old_build:
+    _warn_old_build(old_build)
+    return planned
+
+
+def _warn_old_build(names: list[str]) -> None:
+    if names:
         print(
             "let op: de laatste oefening kwam van een build zonder clientVersion, die nog met de oude regels"
-            " schrijft: " + ", ".join(old_build)
+            " schrijft: " + ", ".join(names)
         )
+
+
+def _plan_lowering(args, students: list[dict], goals: dict) -> list[tuple[dict, dict, dict]]:
+    """The rewrite of `replay-beliefs --uitgesloten` (#342), printed as its
+    dry run. Per student two replays with the same rules (`--regels`) and
+    the same doc stamps (`doc_stamps`, #327): with the oefeningen marked as
+    not counting, as the app read them, and without (`rules.is_excluded`).
+    Only a doc whose LO the two replay differently (`marking_differs`) is
+    rewritten, by `lowered_belief`; every other doc stays untouched, so no
+    stamp the replay does not find for another reason is touched. Returns
+    (student, stored doc, new doc) for each doc to write."""
+    print(
+        f"{'leerling':26}{'docs':>6}{'gemarkeerd':>12}{'anders':>8}{'te schrijven':>14}{'stempel weg':>13}"
+        f"{'stempel later':>15}{'niveau lager':>14}{'α/β anders':>12}{'kalibratie':>12}{'tellingen lager':>17}"
+        f"{'laatste build':>16}"
+    )
+    variant = _variant(args)
+    planned: list[tuple[dict, dict, dict]] = []
+    totals = dict.fromkeys(
+        ("stamp removed", "stamp later", "stamp kept", "stamp gained", "level lowered", "alpha/beta", "calibration",
+         "counts lowered"), 0,
+    )
+    old_build = []
+    for a in students:
+        turns, stored = cosmos.turns(a["uid"]), cosmos.beliefs(a["uid"])
+        stamps = doc_stamps(stored)
+        without = rules.replay(turns, goals, variant=variant, stamps=stamps)
+        marked = rules.replay(turns, goals, variant=variant, stamps=stamps, skip_excluded=False)
+        n_marked = sum(1 for t in turns if rules.is_excluded(t) and not rules.is_audit(t))
+        differ = mine = 0
+        counts = dict.fromkeys(totals, 0)
+        for key in sorted(stored):
+            state = marked.get(key)
+            if state is None or not marking_differs(state, without.get(key)):
+                continue
+            differ += 1
+            new = lowered_belief(stored[key], state, without.get(key))
+            changes = lowered_changes(stored[key], new)
+            if not changes:
+                continue
+            mine += 1
+            planned.append((a, stored[key], new))
+            for c in changes:
+                counts[c] += 1
+                totals[c] += 1
+        build = _last_build(turns)
+        if build == "oud":
+            old_build.append(_full_name(a))
+        print(
+            f"{_full_name(a):26}{len(stored):>6}{n_marked:>12}{differ:>8}{mine:>14}{counts['stamp removed']:>13}"
+            f"{counts['stamp later']:>15}{counts['level lowered']:>14}{counts['alpha/beta']:>12}"
+            f"{counts['calibration']:>12}{counts['counts lowered']:>17}{build:>16}"
+        )
+    writers = {a["uid"] for a, _, _ in planned}
+    print(
+        f"\nte schrijven: {len(planned)} documenten bij {len(writers)} leerling(en) — stempel weg"
+        f" {totals['stamp removed']}, stempel later {totals['stamp later']}, hoogste niveau lager"
+        f" {totals['level lowered']}, α/β anders {totals['alpha/beta']}, positief op kalibratie"
+        f" {totals['calibration']}, tellingen lager {totals['counts lowered']}."
+    )
+    if totals["stamp kept"]:
+        print(
+            f"stempel vastgelegd {totals['stamp kept']}: een oud document zonder firstMasteredAt dat de app als"
+            " aangetoond leest, met een stempel van vóór de gemarkeerde oefeningen: die blijft, nu als veld."
+        )
+    if totals["stamp gained"]:
+        print(
+            f"stempel erbij {totals['stamp gained']}: zonder een gemarkeerd fout antwoord leest de app een oud"
+            " document zonder firstMasteredAt als aangetoond."
+        )
+    print(
+        "Herspeeld met en zonder de oefeningen die niet meetellen (markeer), met dezelfde regels"
+        f"{_rules_flag(args)} en dezelfde stempels van de documenten. Alleen een leerdoel waarop de twee"
+        " verschillen (anders), wordt herschreven: alpha en beta van de herspeling zonder (op de klok van het"
+        " document), firstMasteredAt weg of later als de stempel niet vroeger valt dan de eerste gemarkeerde"
+        " oefening op dat leerdoel, lastPositiveAtCalibratedAt evenzo, highestPositiveDifficulty lager als het"
+        " niveau van het document dat van de herspeling met de gemarkeerde oefeningen is, en de tellingen tot die"
+        " van de herspeling zonder, waar die oefeningen eraan bijdroegen: wat ze bijdroegen, nooit onder 0, en een"
+        " tweede run neemt niets twee keer weg. Een leerdoel zonder verschil blijft onaangeroerd."
+    )
+    print(
+        "Daarna in de app: een leerdoel zonder stempel staat in de balk van de sessie weer open (#325) en komt"
+        " terug als controlevraag, ook bij een eerder hoofddoel (#275). Badges en XP blijven; een gepubliceerd"
+        " rapport verandert niet vanzelf."
+    )
+    print(_rules_note(args))
+    _warn_old_build(old_build)
+    return planned
+
+
+# ---- markeer (#342) ----------------------------------------------------------
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+MARKEER_FORMAT = (
+    '{"reason": "chatbot", "decidedAt": "2026-11-25", "students": {"<uid>": ['
+    '{"id": "<turn_history-id>", "signs": ["vet", "snel"]}, "<turn_history-id>"]}}'
+)
+
+
+def _markeer_file(path_arg: str) -> dict:
+    """The `markeer` file: per student (uid) the oefeningen (their
+    `turn_history` ids), each an id or `{"id", "signs", "reason"}`, and the
+    `reason` and `decidedAt` for all of them. Student data, so outside the
+    repo: a file inside it is refused."""
+    path = Path(path_arg).expanduser().resolve()
+    if path == REPO_ROOT or REPO_ROOT in path.parents:
+        sys.exit(f"{path} staat in de repo; leerlingdata horen erbuiten (bv. {DEFAULT_OUT})")
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as e:
+        sys.exit(f"kan {path} niet lezen: {e}")
+    if not isinstance(data, dict) or not isinstance(data.get("students"), dict):
+        sys.exit(f"{path}: verwacht een object met 'students' per uid, bv.\n  {MARKEER_FORMAT}")
+    return data
+
+
+def _markings(data: dict, wis: bool, today: str) -> dict[str, dict[str, dict | None]]:
+    """Per uid, per oefening id, the `excluded` value to write; None with
+    `--wis`. Stops on an entry that is no oefening id, or, without
+    `--wis`, on an oefening without a reason or a `decidedAt` that is no
+    date."""
+    default_reason, decided = data.get("reason"), data.get("decidedAt") or today
+    if not wis:
+        try:
+            dt.date.fromisoformat(decided)
+        except (TypeError, ValueError):
+            sys.exit(f"decidedAt {decided!r} is geen datum (JJJJ-MM-DD)")
+    out: dict[str, dict[str, dict | None]] = {}
+    for uid, entries in data["students"].items():
+        if not isinstance(entries, list):
+            sys.exit(f"students[{uid!r}]: verwacht een lijst van oefeningen")
+        per: dict[str, dict | None] = {}
+        for entry in entries:
+            entry = {"id": entry} if isinstance(entry, str) else entry
+            if not isinstance(entry, dict) or not isinstance(entry.get("id"), str) or not entry["id"]:
+                sys.exit(f"students[{uid!r}]: {entry!r} is geen oefening (een id, of een object met 'id')")
+            if wis:
+                per[entry["id"]] = None
+                continue
+            reason = entry.get("reason") or default_reason
+            if not isinstance(reason, str) or not reason:
+                sys.exit(f"students[{uid!r}]: oefening {entry['id']} heeft geen reden ('reason')")
+            signs = entry.get("signs") or []
+            if not isinstance(signs, list) or not all(isinstance(x, str) for x in signs):
+                sys.exit(f"students[{uid!r}]: oefening {entry['id']}: 'signs' is een lijst van woorden")
+            per[entry["id"]] = {"reason": reason, "signs": list(signs), "decidedAt": decided}
+        out[uid] = per
+    return out
+
+
+def _backup_docs(container: str, docs: list[dict], label: str) -> Path:
+    """The docs as they are, before a write, to `BACKUP_DIR`."""
+    BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+    stamp = _stamp()
+    path = BACKUP_DIR / f"backup_{label}_{stamp}.json"
+    path.write_text(json.dumps({"takenAt": stamp, container: docs}, ensure_ascii=False), encoding="utf-8")
+    return path
+
+
+def cmd_markeer(args) -> None:
+    """Marks oefeningen in `turn_history` as not counting (#342): the field
+    `excluded` on each, `{"reason", "signs", "decidedAt"}`, which every
+    replay skips (`rules.is_excluded`, `eval12`). `--wis` takes it away.
+
+    A dry run unless `--apply`. With it: backs up the docs it writes
+    (`BACKUP_DIR`), then upserts each with `If-Match` on the etag it read; a
+    doc that changed in between is named and left. No lesson guard: the app
+    only creates `turn_history` docs, and rewrites one only when the teacher
+    acknowledges its signals (`TurnHistoryService.acknowledgeAllFor`), which
+    reads the whole doc and keeps the field. That write has no `If-Match`:
+    should the teacher acknowledge while this writes, run the dry run again.
+
+    The app's `lo_beliefs` keep what the marked oefeningen gave until
+    `replay-beliefs --uitgesloten` lowers it."""
+    data = _markeer_file(args.bestand)
+    today = rules.belgian_time(_now()).date().isoformat()
+    plan = _markings(data, args.wis, today)
+    accounts = {a["uid"]: a for a in cosmos.all_accounts()}
+    unknown = [uid for uid in plan if uid not in accounts]
+    if unknown:
+        sys.exit("onbekende leerling(en) (uid): " + ", ".join(unknown))
+
+    verb = "te wissen" if args.wis else "te markeren"
+    print(f"{'leerling':26}{'in bestand':>12}{'gevonden':>10}{verb:>13}{'al zo':>7}{'niet gevonden':>15}{'geen oefening':>15}")
+    planned: list[tuple[dict, dict, dict]] = []  # (student, stored doc, new doc)
+    missing: list[str] = []
+    for uid, wanted in plan.items():
+        a = accounts[uid]
+        by_id = {t["id"]: t for t in cosmos.turns(uid)}
+        found = same = audit = 0
+        lost = []
+        for tid, mark in wanted.items():
+            doc = by_id.get(tid)
+            if doc is None:
+                lost.append(tid)
+                continue
+            found += 1
+            if rules.is_audit(doc):
+                audit += 1  # no oefening: nothing to count, nothing to mark
+                continue
+            new = {k: v for k, v in doc.items() if k != "excluded"}
+            if mark is not None:
+                new["excluded"] = mark
+            if new == doc:
+                same += 1
+                continue
+            planned.append((a, doc, new))
+        todo = found - same - audit
+        missing += [f"{_full_name(a)}: {tid}" for tid in lost]
+        print(f"{_full_name(a):26}{len(wanted):>12}{found:>10}{todo:>13}{same:>7}{len(lost):>15}{audit:>15}")
+    writers = {a["uid"] for a, _, _ in planned}
+    print(f"\n{verb}: {len(planned)} oefeningen bij {len(writers)} leerling(en).")
+    if missing:
+        print("niet gevonden in turn_history (niets geschreven):\n  " + "\n  ".join(missing))
     if not args.apply:
-        keep = f" (met{_rules_flag(args)})" if args.regels else ""
-        print(f"\nDroge run: er is niets geschreven. Schrijven: dezelfde opdracht{keep} met --apply erbij, buiten de lesuren.")
+        print("\nDroge run: er is niets geschreven. Schrijven: dezelfde opdracht met --apply erbij.")
         return
     if not planned:
         print("\nNiets te schrijven.")
         return
-    busy = _class_at_work(students, args.klas)
-    if busy and not args.force:
-        sys.exit("De klas werkt; niets geschreven. Wacht, of --force:\n  " + "\n  ".join(busy))
-    path = _backup([a for a in students if a["uid"] in writers], None, BACKUP_DIR, f"{_slug(args.klas)}_replay-beliefs")
+    path = _backup_docs("turn_history", [doc for _, doc, _ in planned], "markeer-wis" if args.wis else "markeer")
     print(f"\nback-up: {path}")
-
     written = conflicts = 0
-    for a, stored, new in planned:
+    for a, doc, new in planned:
         try:
-            cosmos.upsert("lo_beliefs", new, a["uid"], etag=stored.get("_etag"))
+            cosmos.upsert("turn_history", new, a["uid"], etag=doc.get("_etag"))
             written += 1
         except cosmos.Conflict:
             conflicts += 1
-            print(f"  {_full_name(a)}: {stored['subgoalId']}/{stored['loId']} veranderde intussen — niet geschreven")
+            print(f"  {_full_name(a)}: {doc['id']} veranderde intussen — niet geschreven")
     print(f"geschreven {written}, conflicten {conflicts}" + (" (draai het opnieuw voor die)" if conflicts else ""))
-    print(f"Controleer met: evaluate.py validate --klas {args.klas}{_rules_flag(args)}")
+    classes = sorted({accounts[uid].get("className") or "?" for uid in writers})
+    for klas in classes:
+        print(f"Daarna, droog: evaluate.py replay-beliefs --klas {klas} --uitgesloten")
 
 
 # ---- what-if -----------------------------------------------------------------
@@ -1330,6 +1770,18 @@ def _blocked_pastes_line(b: dict) -> str | None:
     return f"**Plakken van buiten de app geblokkeerd:** {line}."
 
 
+def _excluded_line(mark) -> str:
+    """The trace's line on a marking (#342): `chatbot (vet, snel), beslist
+    2026-11-25 — de signalen hieronder tellen niet mee`."""
+    mark = mark if isinstance(mark, dict) else {}
+    reason = mark.get("reason") if isinstance(mark.get("reason"), str) else "?"
+    signs = [x for x in mark.get("signs") or [] if isinstance(x, str)]
+    line = reason + (f" ({', '.join(signs)})" if signs else "")
+    if isinstance(mark.get("decidedAt"), str):
+        line += f", beslist {mark['decidedAt']}"
+    return line + " — gemarkeerd: de signalen hieronder tellen niet mee"
+
+
 def _render_trace_row(r: dict) -> list[str]:
     kind = " · ".join(
         x
@@ -1350,6 +1802,8 @@ def _render_trace_row(r: dict) -> list[str]:
     else:
         lo = f"`{r['lo']}`" if r["lo"] else "?"
     out = [f"{r['at']:%H:%M}  {r['subgoal_title']} · {lo} · {kind}"]
+    if r.get("excluded") is not None:
+        out.append(f"  {'telt niet':<9} {_excluded_line(r['excluded'])}")
     if not r["has_turn"]:
         out.append("  (geen turn_history-record: gewist bij een reset?)")
     if not r["has_content"]:
@@ -1460,12 +1914,19 @@ def main() -> None:
     r = sub.add_parser("replay-beliefs"); r.add_argument("--klas", required=True)
     r.add_argument("--leerling", action="append", help="alleen deze leerling (naam, deel ervan of uid); herhaalbaar")
     r.add_argument("--regels", **regels)
+    r.add_argument(
+        "--uitgesloten", action="store_true",
+        help="verlaag wat de oefeningen die niet meetellen (markeer) gaven, alleen op leerdoelen waar dat verschil maakt",
+    )
     r.add_argument("--apply", action="store_true", help="na een back-up echt schrijven, buiten de lesuren")
     r.add_argument("--force", action="store_true", help="ook schrijven als de klas les heeft of werkt")
+    m = sub.add_parser("markeer"); m.add_argument("bestand", help="JSON buiten de repo: per uid de ids van de oefeningen")
+    m.add_argument("--wis", action="store_true", help="haal de markering weg in plaats van ze te zetten")
+    m.add_argument("--apply", action="store_true", help="na een back-up echt schrijven")
     args = ap.parse_args()
     commands = {
         "draft": cmd_draft, "validate": cmd_validate, "backup": cmd_backup, "apply": cmd_apply,
-        "what-if": cmd_what_if, "trace": cmd_trace, "replay-beliefs": cmd_replay_beliefs,
+        "what-if": cmd_what_if, "trace": cmd_trace, "replay-beliefs": cmd_replay_beliefs, "markeer": cmd_markeer,
     }
     commands[args.cmd](args)
 

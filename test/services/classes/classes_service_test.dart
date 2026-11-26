@@ -7,6 +7,7 @@
 // it renames the list, so a failure halfway can be finished by renaming
 // again.
 
+import 'package:ai_tutor_python/services/auth/auth_service.dart';
 import 'package:ai_tutor_python/services/classes/classes_service.dart';
 import 'package:ai_tutor_python/services/classes/school_class.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -45,6 +46,8 @@ void main() {
     config = InMemoryCosmos(docs);
     container = ProviderContainer(
       overrides: [
+        // The polled lists are read for someone signed in (#345).
+        signedInProvider.overrideWithValue(true),
         classesServiceProvider.overrideWith(
           () => ClassesService(container: config.container),
         ),

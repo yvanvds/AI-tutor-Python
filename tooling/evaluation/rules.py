@@ -20,8 +20,21 @@ storage for the clients of that day (checked 2026-09-23 on 6EWI and
 6WEWI), before the one-time rewrite of `lo_beliefs` put their docs under
 the current rules.
 
-Rule set `1.1.3-eval11` = PUNTENFORMULE v1.1.3, replayed from the turn
-log. `eval11` (#327) lets the mastery guard of `eval9` read the stamp on
+Rule set `1.1.3-eval12` = PUNTENFORMULE v1.1.3, replayed from the turn
+log. `eval12` (#342) skips an oefening the teacher marked as not counting
+(`is_excluded`: the field `excluded` on its `turn_history` doc, which
+`evaluate.py markeer` writes — an answer pasted from a chatbot). It stays
+in the log, but gives no signal and no transfer credit: no μ, no stamp, no
+highest level, no own question, and a follow-up on it does not count it
+as right (#326). A follow-up that is not marked itself still counts, as a
+follow-up: that answer is the student's own. Every command reads it so —
+`draft`, `what-if`, `validate`, `replay-beliefs`; `replay(skip_excluded=
+False)` is the log as the app read it, which `replay-beliefs
+--uitgesloten` compares with to lower what the marked oefeningen gave.
+The app does not know the field, so its `lo_beliefs` keep what they took
+until that rewrite. Nothing moves without a marking.
+
+`eval11` (#327) lets the mastery guard of `eval9` read the stamp on
 the LO's doc, as the app does (`isMastered` → `everMasteredBelief`), where
 `validate` and `replay-beliefs` replay (`replay(stamps=...)`). The guard
 read only the replay's own stamp, and with `--regels 1.1` that has no thin
@@ -180,7 +193,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from typing import NamedTuple
 
-RULES_VERSION = "1.1.3-eval11"
+RULES_VERSION = "1.1.3-eval12"
 
 PRIOR = 1.0
 # A backstop since #278: forgetting keeps the evidence under 14.
@@ -415,6 +428,15 @@ def is_audit(turn: dict) -> bool:
     return not turn.get("questionType")
 
 
+def is_excluded(turn: dict) -> bool:
+    """An oefening the teacher marked as not counting (#342): its
+    `turn_history` doc has the field `excluded`, as `evaluate.py markeer`
+    writes it — `{"reason": "chatbot", "signs": [...], "decidedAt": ...}`.
+    The app does not read the field; the replay skips the oefening's
+    signals and transfer credits (`replay(skip_excluded=True)`)."""
+    return bool(turn.get("excluded"))
+
+
 class DirectAnswer(NamedTuple):
     """One direct question about an LO, as the replay counted it: what the
     concept shows under *laatste vragen* (#189)."""
@@ -484,6 +506,11 @@ class LoState:
     own_right: int = 0
     own_right_open: int = 0
     own_streak: int = 0
+    # The first oefening marked as not counting (#342, `is_excluded`) that
+    # wrote this LO — a signal, a neutral one included, or a transfer
+    # credit — on a replay that reads them (`skip_excluded=False`). Where
+    # `replay-beliefs --uitgesloten` may take a stamp away from.
+    first_excluded_at: dt.datetime | None = None
 
     @property
     def mean(self) -> float:
@@ -734,11 +761,21 @@ def replay(
     supervised: Callable[[dict], bool] = recorded_supervised,
     variant: Variant = CURRENT,
     stamps: Mapping[tuple[str, str], dt.datetime] | None = None,
+    skip_excluded: bool = True,
 ) -> dict[tuple[str, str], LoState]:
     """Replays the student's whole turn log into per-LO states.
 
     [variant] replays a candidate rule for 1.1 instead (#248); the default
     is the rule of now.
+
+    [skip_excluded] (#342, `eval12`): an oefening the teacher marked as not
+    counting (`is_excluded`) gives no signal and no transfer credit. It is
+    still an oefening of its own, so it ends a follow-up chain as any
+    question does, and a follow-up on it finishes nothing (#326); a
+    follow-up that is not marked itself counts as one. False replays the
+    marked oefeningen as the app read them, and notes on each LO the first
+    of them that wrote it (`LoState.first_excluded_at`): the replay "with"
+    that `replay-beliefs --uitgesloten` compares the default to.
 
     [stamps] are the stamps on the student's `lo_beliefs` docs, per LO (the
     stamp the app reads, `evaluate.app_stamp`), for the mastery guard
@@ -788,6 +825,12 @@ def replay(
         follow_up = t.get("isFollowUp") is True
         if not follow_up:
             partial_own = None
+        excluded = is_excluded(t)
+        if excluded and skip_excluded:
+            # #342: in the log, and no evidence. A marked own question has
+            # just ended the chain, so its follow-up finishes nothing; a
+            # marked follow-up leaves the chain to the next one.
+            continue
         counts_follow_up = (
             variant.follow_up_after_partial if variant.follow_up_after_partial is not None
             else follow_up_counts(t)
@@ -861,6 +904,8 @@ def replay(
             # A direct neutral adds nothing, and is written all the same:
             # the decayed values, with the clock at its moment (#202).
             lo.alpha, lo.beta, lo.last_at = a, b, now
+            if excluded and lo.first_excluded_at is None:
+                lo.first_excluded_at = now
             if not incidental:
                 lo.regressed_at = None  # a direct measurement, whichever way it went
             if incidental:
@@ -940,6 +985,8 @@ def replay(
                 guarded = guard and _mastered_now(lo, a, b, min_right, min_open, _doc_stamped(stamps, credited, now))
                 lo.alpha, lo.beta = _add_positive(a, b, TRANSFER_CREDIT_ALPHA * s_factor, forgets, guarded)
                 lo.last_at = now
+                if excluded and lo.first_excluded_at is None:
+                    lo.first_excluded_at = now
                 lo.n_transfer += 1
                 if lo.first_mastered_at is None and _stamps(lo, evidence_min, variant, min_right, min_open):
                     lo.first_mastered_at = now

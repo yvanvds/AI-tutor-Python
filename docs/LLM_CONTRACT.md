@@ -342,8 +342,8 @@ Routing (`TutorService.handleStudentMessage`):
 - Theory page on screen → `content_question`, as above (#132).
 - The exercise in flight is the quiz and it waits for its pick →
   `student_question`, the same request a question during a code exercise
-  is. Ahead of a follow-up still in flight: that one belongs to an exercise
-  before the quiz.
+  is. Ahead of the follow-up check below; a follow-up of an exercise
+  before the quiz lapsed when the quiz was planned (#340).
 - After the pick, a follow-up the grader asked under the feedback is
   answered in the chat as for any exercise (`follow_up_answer`, "Grading
   follow-up answers" below). Any other message is a `student_question`.
@@ -392,7 +392,9 @@ A code exercise — a program to write (`write_code`) or code to complete
 the editor (`submit_code`). What they type in the chat meanwhile is a
 `student_question` (`TutorService.handleStudentMessage`, its last branch),
 or a `content_question` when the theory page is on screen (#132); a
-follow-up the grader asked is still answered as a `follow_up_answer`. The
+follow-up the grader asked is still answered as a `follow_up_answer` —
+and so is code handed in through the editor while that follow-up is
+open (#349, "Grading follow-up answers" below). The
 exercise is on the exercise's history the call carries, and the teacher's
 `studentQuestion` doc says to explain Python questions clearly — nothing in
 the prompt said not to give the solution away, so "write the code for me"
@@ -614,6 +616,21 @@ with the follow-up question and the student's answer. The grading
 contract is the same shape as for primary probes — same
 `overallQuality`, `feedbackText`, `loSignals`, and an optional
 nested `followUp` if chains are allowed.
+
+Inputs (`QuestionFormatter.followUpAnswer`): `follow_up_question`, the
+answer, `chain_depth`, `follow_up_rationale` when the grader gave one,
+and the `target_los` of the question the follow-up came after with the
+`goal_scope_los`. The answer is one of two fields:
+
+- `answer` — what the student typed in the chat
+  (`TutorService.handleStudentMessage`);
+- `code` — the code they sent from the editor with "Stuur naar tutor"
+  while the follow-up was open (`TutorService.submitCode`, #349). A
+  follow-up like "how would you change the code so that…" is answered
+  there as naturally as in the chat. That code used to go out as a
+  `submit_code` without a plan: graded, but recorded nowhere, and the
+  next exercise was asked for. It is the follow-up's record now, with the
+  code as its answer in `turn_content`.
 
 Two semantic differences from primary probe grading:
 

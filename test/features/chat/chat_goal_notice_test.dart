@@ -14,6 +14,7 @@ import 'package:ai_tutor_python/features/chat/chat_widget.dart';
 import 'package:ai_tutor_python/features/chat/widgets/chat_system_pill.dart';
 import 'package:ai_tutor_python/features/shell/shell_state.dart';
 import 'package:ai_tutor_python/l10n/generated/app_localizations.dart';
+import 'package:ai_tutor_python/services/auth/auth_service.dart';
 import 'package:ai_tutor_python/services/chat/chat_notice.dart';
 import 'package:ai_tutor_python/services/chat/chat_service.dart';
 import 'package:ai_tutor_python/services/config/app_locale.dart';
@@ -142,6 +143,8 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          // The polled lists are read for someone signed in (#345).
+          signedInProvider.overrideWithValue(true),
           _locale.overrideWith((_) => locale),
           appLocaleProvider.overrideWith((ref) => ref.watch(_locale)),
           translationServiceProvider.overrideWithValue(service),

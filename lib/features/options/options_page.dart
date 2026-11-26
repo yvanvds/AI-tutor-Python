@@ -27,6 +27,7 @@ import 'dart:convert';
 
 import 'package:ai_tutor_python/core/app_mode.dart';
 import 'package:ai_tutor_python/core/app_start.dart';
+import 'package:ai_tutor_python/core/browser_launcher.dart';
 import 'package:ai_tutor_python/core/chat_request_type.dart';
 import 'package:ai_tutor_python/core/question_difficulty.dart';
 import 'package:ai_tutor_python/core/school_file.dart';

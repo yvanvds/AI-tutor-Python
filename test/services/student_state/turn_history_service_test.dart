@@ -210,4 +210,46 @@ void main() {
     expect(r.subgoalAdvanced, isTrue);
     expect(r.signalEvents.single.kind, TurnSignalEventKind.noProgress);
   });
+
+  // #342: the evaluation tooling marks an oefening as not counting with a
+  // field the app does not know (`excluded`, `evaluate.py markeer`). The
+  // only place the app writes an existing record again is the teacher's
+  // acknowledgement; it must keep the marking, or the next replay counts
+  // the answer once more.
+  test('acknowledgeAllFor keeps a field the app does not know', () async {
+    const marking = {
+      'reason': 'chatbot',
+      'signs': ['vet', 'snel'],
+      'decidedAt': '2026-11-25',
+    };
+    store = InMemoryCosmos([
+      {
+        'id': 't1',
+        'type': 'turn_history',
+        'uid': 'u1',
+        'subgoalId': 's1',
+        'turnAt': '2026-11-23T09:00:00.000Z',
+        'questionType': 'completeCodeQuestion',
+        'loSignals': [
+          {
+            'subgoalId': 's1',
+            'loId': 'lo1',
+            'signal': 'positive',
+            'strength': 'strong',
+          },
+        ],
+        'signalEvents': [
+          {'kind': 'noProgress', 'severity': 'strong'},
+        ],
+        'excluded': marking,
+      },
+    ]);
+
+    await service().acknowledgeAllFor('u1');
+
+    final doc = store.docs['t1']!;
+    expect(doc['acknowledgedAt'], isA<String>(), reason: 'it was written');
+    expect(doc['excluded'], marking);
+    expect((doc['loSignals'] as List).single, containsPair('loId', 'lo1'));
+  });
 }
