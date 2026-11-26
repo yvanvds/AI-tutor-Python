@@ -405,7 +405,7 @@ A school file lets students point the app at their school without a build of its
 }
 ```
 
-`databaseName` is optional (default `python-tutor`). So is `databaseAccess`, how the app reaches the database: `"masterKey"` (the default) with the database key of the build, or `"signIn"` with the user's own sign-in ([#306](https://github.com/yvanvds/AI-tutor-Python/issues/306)). A build without school data uses the sign-in for every school file, with or without this field ([#336](https://github.com/yvanvds/AI-tutor-Python/issues/336)), so the school file of an existing install keeps working as it is. The sign-in needs roles on the database and admin consent in the tenant first (see #306). The app refuses a file that has a field named like a key, token or password, and a file with a newer `formatVersion` than it knows; it then says why and changes nothing.
+`databaseName` is optional (default `python-tutor`). So is `databaseAccess`, how the app reaches the database: `"masterKey"` (the default) with the database key of the build, or `"signIn"` with the user's own sign-in ([#306](https://github.com/yvanvds/AI-tutor-Python/issues/306)). A build without school data uses the sign-in for every school file, with or without this field ([#336](https://github.com/yvanvds/AI-tutor-Python/issues/336)), so the school file of an existing install keeps working as it is. The sign-in needs roles on the database and admin consent in the tenant first: see [Access with the user's own sign-in](#access-with-the-users-own-sign-in-for-an-administrator). The app refuses a file that has a field named like a key, token or password, and a file with a newer `formatVersion` than it knows; it then says why and changes nothing.
 
 How the app uses it:
 
@@ -417,7 +417,126 @@ A build that has a school configuration in its `.env` (Step 4) starts in that sc
 
 The school's OpenAI key is not in the school file either: it is `ApiKey` in the school's own `config/global` (Step 6), so every school pays for its own use.
 
-Today only SMA Arcadia's setup exists. The school file only spreads the configuration: a school that wants the school mode still needs Steps 2 and 3 (its own app registration and database, with its content), and until access through the user's own sign-in is switched on ([#306](https://github.com/yvanvds/AI-tutor-Python/issues/306)) a build made with that school's `.env` as well.
+Today only SMA Arcadia's setup exists. The school file only spreads the configuration: a school that wants the school mode still needs Steps 2 and 3 (its own app registration and database, with its content), and until access through the user's own sign-in is switched on ([#306](https://github.com/yvanvds/AI-tutor-Python/issues/306)) a build made with that school's `.env` as well. The sign-in needs the roles and the consent of the next section.
+
+---
+
+## Access with the user's own sign-in (for an administrator)
+
+With `"databaseAccess": "signIn"` in the school file, or in any build without school data ([The school file](#the-school-file)), the app reaches the database with the user's own sign-in instead of the database key ([#306](https://github.com/yvanvds/AI-tutor-Python/issues/306)). Cosmos DB then decides itself what each user may do, from roles you assign. Without those roles and the consent below, the database refuses every request of the app (403), so set them up before you switch the sign-in on. Both need administrator rights and happen outside the app, once per school.
+
+You need:
+
+- **Two security groups** in Entra ID: one with the students, one with the teachers. Which groups (new ones, or groups the school already has) is the school's choice. Copy each group's **Object ID** (**Microsoft Entra ID** → **Groups** → the group → **Overview**). Give the teachers' group the same people as the `Teacher` app role of [Step 2](#step-2--create-the-microsoft-entra-app-registration): the app role decides which pages the app shows, the group what the database allows.
+- **The Azure CLI** (`az`), signed in with `az login` as someone who may manage the Cosmos DB account (for example *Owner* or *DocumentDB Account Contributor* on it).
+
+### Admin consent
+
+The app asks Entra for a token for the database, with the delegated permission `user_impersonation` of Azure Cosmos DB. Grant it once for the whole organisation, so that no student ever sees a consent screen:
+
+1. In the Azure portal, go to **Microsoft Entra ID** → **App registrations** → the app of Step 2 → **API permissions**.
+2. **Add a permission** → **APIs my organization uses** → search for **Azure Cosmos DB** → **Delegated permissions** → tick **`user_impersonation`** → **Add permissions**.
+3. Click **Grant admin consent for &lt;your tenant&gt;** and confirm. The *Status* column now says *Granted*.
+
+### Roles per container
+
+Cosmos DB has two built-in data roles, and they are all this needs:
+
+| Role | Role definition id |
+|------|--------------------|
+| Cosmos DB Built-in Data Reader | `00000000-0000-0000-0000-000000000001` |
+| Cosmos DB Built-in Data Contributor | `00000000-0000-0000-0000-000000000002` |
+
+A role reaches a whole container, or the whole database, never a partition or a single document.
+
+Teachers get Data Contributor on the whole database. Students get, per container, what the app does there in a student's session: **read and write** is Data Contributor, **read** is Data Reader, **none** is no role.
+
+| Container | Students | What a student's session does there |
+|-----------|----------|-------------------------------------|
+| `accounts` | read and write | creates the profile at the first sign-in; streak, XP and badges after each oefening |
+| `progress` | read and write | the progress per goal after each oefening; a reset or an import in Options |
+| `progress_history` | read and write | a progress sample after each oefening |
+| `status_reports` | read and write | the report per subgoal |
+| `lo_beliefs` | read and write | what the student masters, after each oefening |
+| `turn_history` | read and write | a record per graded answer |
+| `turn_content` | read and write | the question, the answer and the feedback of each oefening |
+| `playground_files` | read and write | the files of the Playground |
+| `questions` | read and write | stores a new question and counts each answer; shared by all students |
+| `podium` | read and write | claims a place on the class podium; shared by all students |
+| `goals` | read | the goal tree |
+| `instructions` | read | the tutor's prompts |
+| `config` | read | `global` (the school's settings) and `classes` (the timetable) |
+| `content` | read | the lessons |
+| `translations` | read | the lessons and goal texts in another language |
+| `milestones` | read | the report dates |
+| `reports` | read | the student's own published reports |
+| `modules` | none | not opened in a student's session |
+| `grade_proposals` | none | not opened in a student's session |
+
+The writes in the containers students only read are the teacher's: the Goals, Lesson content, Instructions, Classes, Milestones and Reports pages, and the school's model in Options. The list is worked out from the code: `kStudentAccess` in [lib/core/cosmos_paths.dart](lib/core/cosmos_paths.dart) says, per container, where the writes come from, and `test/core/cosmos_student_access_test.dart` checks that this table and the commands below say the same, for every container.
+
+The assignments, from PowerShell. Fill in the first five lines; `$db` is the `databaseName` of the school file:
+
+```powershell
+$account     = "<cosmos-account-name>"
+$group       = "<resource-group>"
+$db          = "python-tutor"
+$students    = "<object id of the students' group>"
+$teachers    = "<object id of the teachers' group>"
+$reader      = "00000000-0000-0000-0000-000000000001"  # Cosmos DB Built-in Data Reader
+$contributor = "00000000-0000-0000-0000-000000000002"  # Cosmos DB Built-in Data Contributor
+
+# Teachers: read and write on the whole database
+az cosmosdb sql role assignment create --account-name $account --resource-group $group --scope "/dbs/$db" --principal-id $teachers --role-definition-id $contributor
+
+# Students: read and write
+az cosmosdb sql role assignment create --account-name $account --resource-group $group --scope "/dbs/$db/colls/accounts" --principal-id $students --role-definition-id $contributor
+az cosmosdb sql role assignment create --account-name $account --resource-group $group --scope "/dbs/$db/colls/progress" --principal-id $students --role-definition-id $contributor
+az cosmosdb sql role assignment create --account-name $account --resource-group $group --scope "/dbs/$db/colls/progress_history" --principal-id $students --role-definition-id $contributor
+az cosmosdb sql role assignment create --account-name $account --resource-group $group --scope "/dbs/$db/colls/status_reports" --principal-id $students --role-definition-id $contributor
+az cosmosdb sql role assignment create --account-name $account --resource-group $group --scope "/dbs/$db/colls/lo_beliefs" --principal-id $students --role-definition-id $contributor
+az cosmosdb sql role assignment create --account-name $account --resource-group $group --scope "/dbs/$db/colls/turn_history" --principal-id $students --role-definition-id $contributor
+az cosmosdb sql role assignment create --account-name $account --resource-group $group --scope "/dbs/$db/colls/turn_content" --principal-id $students --role-definition-id $contributor
+az cosmosdb sql role assignment create --account-name $account --resource-group $group --scope "/dbs/$db/colls/playground_files" --principal-id $students --role-definition-id $contributor
+az cosmosdb sql role assignment create --account-name $account --resource-group $group --scope "/dbs/$db/colls/questions" --principal-id $students --role-definition-id $contributor
+az cosmosdb sql role assignment create --account-name $account --resource-group $group --scope "/dbs/$db/colls/podium" --principal-id $students --role-definition-id $contributor
+
+# Students: read
+az cosmosdb sql role assignment create --account-name $account --resource-group $group --scope "/dbs/$db/colls/goals" --principal-id $students --role-definition-id $reader
+az cosmosdb sql role assignment create --account-name $account --resource-group $group --scope "/dbs/$db/colls/instructions" --principal-id $students --role-definition-id $reader
+az cosmosdb sql role assignment create --account-name $account --resource-group $group --scope "/dbs/$db/colls/config" --principal-id $students --role-definition-id $reader
+az cosmosdb sql role assignment create --account-name $account --resource-group $group --scope "/dbs/$db/colls/content" --principal-id $students --role-definition-id $reader
+az cosmosdb sql role assignment create --account-name $account --resource-group $group --scope "/dbs/$db/colls/translations" --principal-id $students --role-definition-id $reader
+az cosmosdb sql role assignment create --account-name $account --resource-group $group --scope "/dbs/$db/colls/milestones" --principal-id $students --role-definition-id $reader
+az cosmosdb sql role assignment create --account-name $account --resource-group $group --scope "/dbs/$db/colls/reports" --principal-id $students --role-definition-id $reader
+
+# What is assigned now
+az cosmosdb sql role assignment list --account-name $account --resource-group $group --output table
+```
+
+Good to know:
+
+- **It takes a few minutes.** A new role assignment, or a change to who is in a group, can take a few minutes to reach the database. Until then those requests still get a 403: wait before you change anything else.
+- **Containers stay with the teacher.** A token from a sign-in cannot create or delete containers; the roles above only cover the documents in them. Create a container as in [Step 3](#step-3--create-the-azure-cosmos-db), with the portal or `az cosmosdb sql container create`. A version that adds a container adds a row to the table above: create the container and give it its role before you release that version.
+- **The class podium.** Builds from before #338 write the podium in `config`, which students may only read, so that write is refused. Keep those builds out with `MinimumVersion` (Step 6) before you switch the sign-in on.
+- **The teacher's tooling** (`tooling/`) keeps reaching the database with the key from `.env`; the roles do not change it.
+
+### Check it before you switch
+
+[tooling/school/check_signin_access.py](tooling/school/check_signin_access.py) tries every kind of request the app makes, with a token from your own sign-in, on a test container of its own. It refuses a container the app uses. Run it as a teacher once the consent and the roles are in place:
+
+```powershell
+# A test container (partition key /pk, or any other but /id)
+az cosmosdb sql container create --account-name $account --resource-group $group --database-name $db --name signin_check --partition-key-path /pk --partition-key-version 2
+
+# Sign in (a browser opens) and try create, read, query, replace with If-Match, a transactional batch and delete
+python tooling/school/check_signin_access.py --container signin_check --database $db
+
+# Remove the test container again
+az cosmosdb sql container delete --account-name $account --resource-group $group --database-name $db --name signin_check
+```
+
+It reads the tenant, the app's client id and the database endpoint from `.env` (`ENTRA_TENANT_ID`, `ENTRA_CLIENT_ID`, `COSMOS_ENDPOINT`) and prints none of them, nor the token: only each step's status code, and for a 403 the permission that is missing. The sign-in is the app's own (a browser, then back to `http://localhost`), so the app registration needs no change. It ends with exit code 0 when every step answered as the app expects. As a teacher it checks the role on the whole database; to check a role on a single container and a group as well, give the students' group Data Contributor on the test container (`--scope "/dbs/$db/colls/signin_check"`) and run it again signed in with an account in that group (the browser asks which account). Then switch the sign-in on in the school file ([The school file](#the-school-file)).
 
 ---
 

@@ -87,6 +87,8 @@ lib/
 │   ├── answer_quality.dart      # wrong | partial | correct
 │   ├── cosmos_client.dart       # Hand-rolled Cosmos REST client + BatchOperation
 │   ├── cosmos_paths.dart        # Single source of truth for container handles + CosmosPartitions
+│   │                            #   + kStudentAccess (#306): per container, read and write / read / none
+│   │                            #   for students with the user's own sign-in (README role table)
 │   ├── cosmos_doc_id.dart       # Composite id conventions (incl. turnHistory)
 │   ├── cosmos_safety.dart       # safeCosmos / safeCosmosStream / pollingStream
 │   ├── github_release.dart      # NEW (#50) — reads the GitHub Releases API + the .sha256 asset
@@ -307,6 +309,9 @@ docs/                                  # CONDUCTOR_POLICY.md, STUDENT_MODEL.md, 
 tooling/build_release.ps1              # Version stamp + build + installer + release assets (incl. the .sha256)
 tooling/badges/podium_backfill.py      # NEW (#221) — the class podium from turn_history, for the subgoals finished
                                        #   before #221 (dry run: counts only; --apply creates after a backup)
+tooling/school/check_signin_access.py  # NEW (#306) — tries create/read/query/replace (If-Match)/batch/delete
+                                       #   with a token from the teacher's own sign-in on a test container
+                                       #   (refuses the app's containers; prints status codes only)
 .github/workflows/                     # build.yml (format gate, analyze, unit tests, integration job) + static.yml
 ```
 
